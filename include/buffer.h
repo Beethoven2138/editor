@@ -205,4 +205,6 @@ static size_t find_offset_in_cache(const PIECE *piece, FILE_BUFFER *buffer)
         return MAGIC;
 }
 
+void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER *buffer);
+
 #endif

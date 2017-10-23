@@ -10,8 +10,8 @@ int main(int argc, char *argv[])
 	insert_item("I", 1, 288, buffer);
 	insert_item(" Work", 5, 289, buffer);
 
-	/*insert_item("HELLO", 5, 67, buffer);
-	insert_item("3HELLO2", 7, 72, buffer);
+	insert_item("HELLO", 5, 67, buffer);
+	/*insert_item("3HELLO2", 7, 72, buffer);
 
 	insert_item(" BYE!", 5, 289, buffer);
 	insert_item("BYE !", 5, 200, buffer);

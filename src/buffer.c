@@ -58,10 +58,10 @@ FILE_BUFFER* init_buffer(char *input_file)
 	table->span2 = table->span1 + GAP_SIZE;
 	table->span2_len = NR_LINES * NR_COLS;
 
-	ret->user_cache = (BUFFER*)malloc(sizeof(BUFFER));
+	/*ret->user_cache = (BUFFER*)malloc(sizeof(BUFFER));
 	ret->user_cache->buffer = (char*)malloc(10);
 	ret->user_cache->offset = 0;
-	ret->user_cache->size = 10;
+	ret->user_cache->size = 10;*/
 
 	init_tui(ret);
 
@@ -85,8 +85,8 @@ void release_buffer(FILE_BUFFER *buffer)
 
 	free(buffer->name);
 
-	free(buffer->user_cache->buffer);
-	free(buffer->user_cache);
+	/*free(buffer->user_cache->buffer);
+	free(buffer->user_cache);*/
 
         RBTreeDestroy(buffer->piece_desc->tree);
 	free(buffer->piece_desc);
@@ -101,7 +101,7 @@ void release_buffer(FILE_BUFFER *buffer)
 
 	free(buffer);
 }
-
+/*
 void clear_user_cache(FILE_BUFFER *buffer)
 {
 	BUFFER *cache = buffer->user_cache;
@@ -118,7 +118,9 @@ void user_cache_append(const char new_item, FILE_BUFFER *buffer)
 		cache->buffer = (char*)realloc((void*)cache->buffer, cache->size);
 	}
 	cache->buffer[cache->offset++] = new_item;
-}
+}*/
+
+
 
 void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER *buffer)
 {
@@ -128,7 +130,7 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 #endif
 	*table->gap = new_item;
 	--table->gap_len;
-	--table_gap;
+	++table->gap;
 	++table->span1_len;
 
 	if (table->gap_len == 0)
@@ -136,14 +138,15 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 #ifdef DEBUG_ASSERT
 		assert(table->span1_len + table->gap_len + table->span2_len <= NR_COLS * NR_LINES);
 #endif
-		table->span2 = memmove(table->span2 + GAP_SIZE, table->gap2, table->span2_len);
+		table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
 		table->gap_len = GAP_SIZE;
 	}
 	if (table->line[*y_pos].len == table->cols)
 	{
+		--table->line[*y_pos].len;
 		++(*y_pos);
-		*x_pos = 0;
-		for (size_t i = table->lines-1; i >= (*y_pos); ++i)
+
+		for (size_t i = table->lines-1; i >= (*y_pos); --i)
 		{
 			if (i == *y_pos)
 			{
@@ -155,8 +158,16 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 	}
 	else
 	{
-		++(*xPos);
+		++(*x_pos);
 		++table->line[*y_pos].len;
+		if (*x_pos == table->cols)
+		{
+			++(*y_pos);
+			*x_pos = 0;
+#ifdef DEBUG_ASSERT
+			assert(*y_pos < table->lines);
+#endif
+		}
 	}
 }
 
@@ -166,7 +177,7 @@ void inc_line_gap(FILE_BUFFER *buffer)
 #ifdef DEBUG_ASSERT
 	assert(table->gap + table->gap_len + 1 < table->span2 + table->span2_len);
 #endif
-	
+
 }
 
 void move_line_gap(int change, FILE_BUFFER *buffer)
@@ -175,7 +186,7 @@ void move_line_gap(int change, FILE_BUFFER *buffer)
 #ifdef DEBUG_ASSERT
 	assert(table->span1 + change < table->span2 + table->span2_len);
 #endif
-	
+
 }
 
 size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer)
@@ -215,9 +226,6 @@ PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off
 	return tmp->piece;*/
 	//TODO: situation when len overlaps multiple pieces
 	rb_red_blk_node *ret = buffer->piece_desc->tree->root->left;
-
-	if (offset == 296)
-		printf("here");
 
 	while (ret != buffer->piece_desc->tree->nil)
 	{
@@ -335,7 +343,7 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 		char old_flags = cur_piece->flags;
 		size_t old_pos = off;
 		cur_piece->size = new;
-		fix_sizes(cur_piece, new - (int)old);
+		fix_sizes(cur_piece, (int)new - (int)old);
 
 		cur_piece = piece_insert_right(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
 		change_current(cur_piece, buffer);
@@ -571,9 +579,6 @@ char buffer_readc(size_t offset, FILE_BUFFER *buffer)
 	size_t abs_off;
 	PIECE *container = find_containing_piece(offset, buffer, &abs_off);
 
-	if (offset == 72)
-		printf("here");
-
 #ifdef DEBUG_ASSERT
 	if (container == NULL)
 	{
@@ -599,7 +604,7 @@ void fill_lines(FILE_BUFFER *buffer, size_t offset)
 	int i = 0;
 	int abs_i = 0;
 	char c;
-	while (lineno < lines && offset < size-1)
+	while (lineno < lines && offset < size)
 	{
 		c = buffer_readc(offset++, buffer);
 		if (abs_i + l_table->span1 == l_table->gap)

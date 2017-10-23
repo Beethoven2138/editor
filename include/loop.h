@@ -21,6 +21,8 @@
 
 #define NORMAL 0x200000
 
+typedef struct _file_buffer FILE_BUFFER;
+
 void loop(FILE_BUFFER *buffer);
 
 #endif
