@@ -56,14 +56,17 @@ FILE_BUFFER* init_buffer(char *input_file)
 	table->gap = table->span1;
 	table->gap_len = GAP_SIZE;
 	table->span2 = table->span1 + GAP_SIZE;
-	table->span2_len = NR_LINES * NR_COLS;
+	table->span2_len = ret->buffer_size;
 
 	/*ret->user_cache = (BUFFER*)malloc(sizeof(BUFFER));
 	ret->user_cache->buffer = (char*)malloc(10);
 	ret->user_cache->offset = 0;
 	ret->user_cache->size = 10;*/
 
+
 	init_tui(ret);
+
+	fill_lines(ret, 0);
 
 	return ret;
 }
@@ -120,8 +123,6 @@ void user_cache_append(const char new_item, FILE_BUFFER *buffer)
 	cache->buffer[cache->offset++] = new_item;
 }*/
 
-
-
 void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
@@ -138,13 +139,16 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 #ifdef DEBUG_ASSERT
 		assert(table->span1_len + table->gap_len + table->span2_len <= NR_COLS * NR_LINES);
 #endif
-		table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
+		//table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
+		//table->gap_len = GAP_SIZE;
+		insert_item(table->gap-GAP_SIZE, GAP_SIZE, table->offset+table->span1_len-GAP_SIZE, buffer);
+	        table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
 		table->gap_len = GAP_SIZE;
 	}
 	if (table->line[*y_pos].len == table->cols)
 	{
 		--table->line[*y_pos].len;
-		++(*y_pos);
+		/*++(*y_pos);
 
 		for (size_t i = table->lines-1; i >= (*y_pos); --i)
 		{
@@ -154,9 +158,10 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 			}
 			else
 				table->line[i].len = table->line[i-1].len;
-		}
+				}*/
+		++table->line[(*y_pos)+1].len;
 	}
-	else
+
 	{
 		++(*x_pos);
 		++table->line[*y_pos].len;
@@ -171,13 +176,48 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 	}
 }
 
-void inc_line_gap(FILE_BUFFER *buffer)
+void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
 #ifdef DEBUG_ASSERT
 	assert(table->gap + table->gap_len + 1 < table->span2 + table->span2_len);
+	assert(table->span2_len > 0);
 #endif
+        if (++(*x) > table->line[*y].len)
+	{
+		++(*y);
+		(*x) = 0;
+	}
+	else
+	{
+		++table->span1_len;
+		++table->gap;
+		--table->span2_len;
+		*(table->gap - 1) = *(table->span2);
+		*(table->span2++) = 0;
+	}
+}
 
+void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *table = buffer->lines;
+
+	if (*x == 0)
+	{
+		if (*y == 0)
+			return;
+		--(*y);
+		*x = table->line[*y].len;
+	}
+	else
+	{
+		--table->span1_len;
+		--table->gap;
+		++table->span2_len;
+		*(--table->span2) = *(table->gap);
+		memmove(table->gap, table->gap+1, table->gap_len);
+	        --(*x);
+	}
 }
 
 void move_line_gap(int change, FILE_BUFFER *buffer)
@@ -474,7 +514,7 @@ void key_destroy(void *key)
 }
 
 /*
-  For when the size fild in a piece changes.
+  For when the size field in a piece changes.
   Need to update the size_left field of all its right parents.
  */
 void fix_sizes(PIECE *piece, int change)
@@ -629,6 +669,7 @@ void fill_lines(FILE_BUFFER *buffer, size_t offset)
 		}
 	}
 	buffer->lines->used = lineno + 1;
+	buffer->lines->offset = offset;
 }
 
 PIECE *piece_insert_left(size_t size, char flags, size_t span_off, FILE_BUFFER *buffer)

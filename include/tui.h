@@ -15,6 +15,7 @@ typedef struct _win_desc
 	char *name;
 	size_t name_len;
 
+	/*for overall window*/
 	size_t x;
 	size_t y;
 

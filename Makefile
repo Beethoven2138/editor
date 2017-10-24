@@ -5,6 +5,7 @@ OBJECTS=obj/main.o \
 	obj/red_black_tree.o \
 	obj/tui.o \
 	obj/common.o \
+	obj/loop.o \
 
 obj/%.o: src/%.c
 	mkdir -p $(@D)

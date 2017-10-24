@@ -104,6 +104,7 @@ typedef struct _line
 
 typedef struct _line_table
 {
+	size_t offset;
 	char *span1;
 	size_t span1_len;
 
@@ -122,6 +123,19 @@ typedef struct _line_table
 		      */
 } LINE_TABLE;
 
+static inline size_t line_off(size_t lineno, LINE_TABLE *table)
+{
+#ifdef DEBUG_ASSERT
+	assert(lineno < NR_LINES);
+#endif
+	size_t ret = 0;
+	for (size_t i = 0; i < lineno; ++i)
+	{
+		ret += table->line[i].len;
+	}
+	return ret;
+}
+
 typedef struct _win_desc WIN_DESC;
 
 typedef struct _file_buffer
@@ -139,6 +153,9 @@ typedef struct _file_buffer
 	PIECE_DESC *piece_desc;
 	WIN_DESC *win_desc;
 	LINE_TABLE *lines;
+	/*for text*/
+	size_t x;
+	size_t y;
 } FILE_BUFFER;
 
 FILE_BUFFER* init_buffer(char *input_file);
@@ -206,5 +223,7 @@ static size_t find_offset_in_cache(const PIECE *piece, FILE_BUFFER *buffer)
 }
 
 void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER *buffer);
+void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer);
+void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer);
 
 #endif

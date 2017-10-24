@@ -1,5 +1,6 @@
 #include <buffer.h>
 #include <tui.h>
+#include <loop.h>
 
 int main(int argc, char *argv[])
 {
@@ -7,7 +8,7 @@ int main(int argc, char *argv[])
 
 	//print_buffer(buffer);
 
-	insert_item("I", 1, 288, buffer);
+	/*insert_item("I", 1, 288, buffer);
 	insert_item(" Work", 5, 289, buffer);
 
 	insert_item("HELLO", 5, 67, buffer);
@@ -15,7 +16,7 @@ int main(int argc, char *argv[])
 
 	insert_item(" BYE!", 5, 289, buffer);
 	insert_item("BYE !", 5, 200, buffer);
-	delete_item(68, 2, buffer);*/
+	delete_item(68, 2, buffer);
 
 	//printf("\n\n\n\n\n\n");
 
@@ -23,12 +24,14 @@ int main(int argc, char *argv[])
 
 	fill_lines(buffer, 0);
 
-	print_lines(buffer->lines);
+	print_lines(buffer->lines);*/
 	
 	//init_tui(buffer);
 
 	//end_tui(buffer);
 
+	loop(buffer);
+	
 	release_buffer(buffer);
 
 	return 0;

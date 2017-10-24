@@ -11,21 +11,15 @@ int init_tui(FILE_BUFFER *buffer)
 	buffer->lines->lines = LINES;
 	buffer->lines->cols = COLS;
 
+	keypad(stdscr, TRUE);
 	cbreak();
-
-	printw("works");
-
-	/*mvprintw(10, 10, "hello");
-	mvprintw(10, 12, "be");
-	
-	getch();*/
+	noecho();
 
 	return EXIT_SUCCESS;
 }
 
 void end_tui(WIN_DESC *win)
 {
-	getch();
 	nocbreak();
 	endwin();
 }
@@ -33,6 +27,8 @@ void end_tui(WIN_DESC *win)
 int get_char(void)
 {
 	int ch = getch();
+	if (ch == KEY_DOWN || ch == KEY_UP || ch == KEY_LEFT || ch == KEY_RIGHT)
+		return ARROW | ch;
 	if (ch >= 32 && ch <= 126)
 		return NORMAL | ch;
 	if (ch >= KEY_F(2) && ch <= KEY_F(7))
@@ -47,8 +43,6 @@ int get_char(void)
 		return DELETE_KEY;
 	if (ch == 9)
 		return TAB_KEY;
-	if (ch == KEY_DOWN || ch == KEY_UP || ch == KEY_LEFT || ch == KEY_RIGHT)
-		return ARROW | ch;
 	if (ch == 10 || ch == KEY_ENTER)
 		return ENTER_KEY;
 	if (ch == 0x1B)
