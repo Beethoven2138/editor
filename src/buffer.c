@@ -1,3 +1,14 @@
+/*  editor is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    editor is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    You should have received a copy of the GNU General Public License
+    along with editor.  If not, see <http://www.gnu.org/licenses/>.*/
+
 #include <buffer.h>
 
 FILE_BUFFER* init_buffer(char *input_file)
@@ -183,6 +194,20 @@ void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 	assert(table->gap + table->gap_len + 1 < table->span2 + table->span2_len);
 	assert(table->span2_len > 0);
 #endif
+	if (table->gap_len < GAP_SIZE)
+	{
+		size_t len = GAP_SIZE - table->gap_len;
+#ifdef DEBUG_ASSERT
+		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
+#else
+		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
+#endif
+		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
+		table->gap_len = GAP_SIZE;
+#ifdef DEBUG_ASSERT
+		assert(table->span2_len - len > 0);
+#endif
+	}
         if (++(*x) > table->line[*y].len)
 	{
 		++(*y);
@@ -202,6 +227,22 @@ void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
 
+	//if (table->gap_len < GAP_SIZE
+
+	if (table->gap_len < GAP_SIZE)
+	{
+		size_t len = GAP_SIZE - table->gap_len;
+#ifdef DEBUG_ASSERT
+		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
+#else
+		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
+#endif
+		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
+		table->gap_len = GAP_SIZE;
+#ifdef DEBUG_ASSERT
+		assert(table->span2_len - len > 0);
+#endif
+	}
 	if (*x == 0)
 	{
 		if (*y == 0)
@@ -220,13 +261,13 @@ void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 	}
 }
 
-void move_line_gap(int change, FILE_BUFFER *buffer)
+void goto_next_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
 #ifdef DEBUG_ASSERT
-	assert(table->span1 + change < table->span2 + table->span2_len);
+	assert(*y > table->lines);
 #endif
-
+	
 }
 
 size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer)
@@ -669,7 +710,6 @@ void fill_lines(FILE_BUFFER *buffer, size_t offset)
 		}
 	}
 	buffer->lines->used = lineno + 1;
-	buffer->lines->offset = offset;
 }
 
 PIECE *piece_insert_left(size_t size, char flags, size_t span_off, FILE_BUFFER *buffer)
