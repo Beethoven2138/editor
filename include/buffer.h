@@ -163,6 +163,8 @@ typedef struct _file_buffer
 FILE_BUFFER* init_buffer(char *input_file);
 void release_buffer(FILE_BUFFER *buffer);
 
+int save_buffer(FILE_BUFFER *buffer, const char *file_name);
+
 size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer);
 
 int insert_item(const char *new_item, size_t len, size_t abs_size_left, FILE_BUFFER *buffer);

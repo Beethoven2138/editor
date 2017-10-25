@@ -1,4 +1,5 @@
-/*  editor is free software: you can redistribute it and/or modify
+/*  
+    editor is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
@@ -7,7 +8,12 @@
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
     You should have received a copy of the GNU General Public License
-    along with editor.  If not, see <http://www.gnu.org/licenses/>.*/
+    along with editor.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+
+/*AUTHOR: SAXON SUPPLE*/
+
 
 #include <buffer.h>
 
@@ -79,7 +85,47 @@ FILE_BUFFER* init_buffer(char *input_file)
 
 	fill_lines(ret, 0);
 
+	fclose(in_filp);
+
 	return ret;
+}
+
+int save_buffer(FILE_BUFFER *buffer, const char *file_name)
+{
+#ifdef DEBUG_ASSERT
+	assert(buffer->lines->gap_len == GAP_SIZE);
+#endif
+	PIECE_DESC *desc = buffer->piece_desc;
+
+	PIECE *piece = (PIECE*)TreeMin(desc->tree)->info;
+
+	char *add_buf = buffer->add_buf->buffer;
+
+	FILE *fp = fopen(file_name, "w+");
+
+	if (fp == NULL)
+		return -1;
+
+        while (piece != NULL)
+	{
+		if ((piece->flags & 8) == 8)
+		{
+		        for (size_t off = 0; off < piece->size; ++off)
+			{
+				fputc(buffer->file_buf[piece->offset + off], fp);
+			}
+		}
+		else
+		{
+			for (size_t off = 0; off < piece->size; ++off)
+			{
+				fputc(add_buf[piece->offset + off], fp);
+			}
+		}
+	        piece = (PIECE*)(TreeSuccessor(desc->tree, piece->node)->info);
+	}
+	fclose(fp);
+	return 0;
 }
 
 void release_buffer(FILE_BUFFER *buffer)
@@ -351,6 +397,8 @@ void move_line_gap_back(size_t count, FILE_BUFFER *buffer)
 	table->gap -= count;
 }
 
+
+
 size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer)
 {
 	if (buffer == NULL || new_item == NULL || len == 0)
@@ -380,6 +428,8 @@ size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer)
 
 	return wrote;
 }
+
+
 
 PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off)
 {
@@ -472,6 +522,8 @@ PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off
 	return 0;
 }*/
 
+
+
 int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *buffer)
 {
 	size_t off;
@@ -517,6 +569,8 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 
 	return 0;
 }
+
+
 
 /*
   To delete an item:
@@ -573,6 +627,8 @@ static void delete_piece(PIECE *piece, FILE_BUFFER *buffer/*, char flags*/)
 	RBDelete(buffer->piece_desc->tree, piece->node);
 }
 
+
+
 size_t piece_offset(const PIECE *key)
 {
 	size_t offset;
@@ -596,6 +652,8 @@ size_t piece_offset(const PIECE *key)
 	return offset;
 }
 
+
+/*used for the red-black tree*/
 int piece_compare(const void *a, const void *b)
 {
 	const PIECE *_a = (PIECE*)a;
@@ -635,6 +693,8 @@ void key_destroy(void *key)
 	}
 }
 
+
+
 /*
   For when the size field in a piece changes.
   Need to update the size_left field of all its right parents.
@@ -660,6 +720,7 @@ void fix_sizes(PIECE *piece, int change)
 		node = node->parent;
 	}
 }
+
 
 
 void print_buffer(FILE_BUFFER *buffer)
@@ -696,6 +757,8 @@ void print_buffer(FILE_BUFFER *buffer)
 	        piece = (PIECE*)(TreeSuccessor(desc->tree, piece->node)->info);
 	}
 }
+
+
 
 ssize_t buffer_read(char *dest, size_t offset, size_t count, FILE_BUFFER *buffer)
 {
@@ -736,6 +799,8 @@ ssize_t buffer_read(char *dest, size_t offset, size_t count, FILE_BUFFER *buffer
 	return read;
 }
 
+
+
 char buffer_readc(size_t offset, FILE_BUFFER *buffer)
 {
 	size_t abs_off;
@@ -753,6 +818,8 @@ char buffer_readc(size_t offset, FILE_BUFFER *buffer)
 
 	return *(GET_BUFFER(buffer, container->flags) + piece_off + container->offset);
 }
+
+
 
 void fill_lines(FILE_BUFFER *buffer, size_t offset)
 {
@@ -792,6 +859,8 @@ void fill_lines(FILE_BUFFER *buffer, size_t offset)
 	}
 	buffer->lines->used = lineno + 1;
 }
+
+
 
 PIECE *piece_insert_left(size_t size, char flags, size_t span_off, FILE_BUFFER *buffer)
 {
