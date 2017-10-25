@@ -50,7 +50,15 @@ void loop(FILE_BUFFER *buffer)
 			switch (c)
 			{
 			case ARROW | KEY_DOWN:
+			{
+				goto_next_line(&y, &x, buffer);
+				break;
+			}
 			case ARROW | KEY_UP:
+			{
+				goto_prev_line(&y, &x, buffer);
+				break;
+			}
 			case ARROW | KEY_LEFT:
 			{
 				dec_line_gap(&y, &x, buffer);

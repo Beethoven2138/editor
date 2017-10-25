@@ -50,6 +50,8 @@ typedef struct _file_buffer FILE_BUFFER;
 
 #define CURRENT(a) (a->piece_desc->cache[0].piece)
 
+#define GAP_OFF(a) (a->gap - a->span1)
+
 typedef struct _piece
 {
 	char flags;
@@ -225,5 +227,9 @@ static size_t find_offset_in_cache(const PIECE *piece, FILE_BUFFER *buffer)
 void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER *buffer);
 void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer);
 void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer);
+void goto_next_line(size_t *y, size_t *x, FILE_BUFFER *buffer);
+void goto_prev_line(size_t *y, size_t *x, FILE_BUFFER *buffer);
+void move_line_gap_fwd(size_t count, FILE_BUFFER *buffer);
+void move_line_gap_back(size_t count, FILE_BUFFER *buffer);
 
 #endif

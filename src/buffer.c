@@ -265,9 +265,90 @@ void goto_next_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
 #ifdef DEBUG_ASSERT
-	assert(*y > table->lines);
+	assert(*y < table->lines);
 #endif
-	
+	if (table->gap_len < GAP_SIZE)
+	{
+		size_t len = GAP_SIZE - table->gap_len;
+#ifdef DEBUG_ASSERT
+		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
+#else
+		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
+#endif
+		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
+		table->gap_len = GAP_SIZE;
+#ifdef DEBUG_ASSERT
+		assert(table->span2_len - len > 0);
+#endif
+	}
+	if (*y >= table->lines-1)
+		return;
+	size_t old_x = *x;
+	if (table->line[(*y)+1].len < *x)
+	{
+		*x = table->line[(*y)+1].len;
+	}
+	++(*y);
+	move_line_gap_fwd(table->line[(*y)-1].len-old_x+(*x), buffer);
+}
+
+void goto_prev_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *table = buffer->lines;
+#ifdef DEBUG_ASSERT
+	assert(*y < table->lines);
+#endif
+	if (table->gap_len < GAP_SIZE)
+	{
+		size_t len = GAP_SIZE - table->gap_len;
+#ifdef DEBUG_ASSERT
+		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
+#else
+		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
+#endif
+		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
+		table->gap_len = GAP_SIZE;
+#ifdef DEBUG_ASSERT
+		assert(table->span2_len - len > 0);
+#endif
+	}
+	if (*y == 0)
+		return;
+	size_t old_x = *x;
+	if (table->line[(*y)-1].len < *x)
+	{
+		*x = table->line[(*y)-1].len;
+	}
+	--(*y);
+	move_line_gap_back(old_x+(table->line[*y].len-(*x)), buffer);
+}
+
+void move_line_gap_fwd(size_t count, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *table = buffer->lines;
+#ifdef DEBUG_ASSERT
+	assert(table->gap_len == GAP_SIZE);
+	assert(count <= table->span2_len);
+#endif
+	memcpy(table->gap, table->span2, count);
+	table->span2 += count;
+	table->span2_len -= count;
+	table->span1_len += count;
+	table->gap += count;
+}
+
+void move_line_gap_back(size_t count, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *table = buffer->lines;
+#ifdef DEBUG_ASSERT
+	assert(table->gap_len == GAP_SIZE);
+	assert(count <= table->span1_len);
+#endif
+	memcpy(table->span2-count, table->gap-count, count);
+	table->span2 -= count;
+	table->span2_len += count;
+	table->span1_len -= count;
+	table->gap -= count;
 }
 
 size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer)
