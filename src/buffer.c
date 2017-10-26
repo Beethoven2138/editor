@@ -48,7 +48,7 @@ FILE_BUFFER* init_buffer(char *input_file)
 
 	ret->piece_desc = (PIECE_DESC*)malloc(sizeof(PIECE_DESC));
 	ret->piece_desc->tree = RBTreeCreate(piece_compare, key_destroy, info_destroy);
-	memset(ret->piece_desc->cache, 0, CACHE_SIZE * sizeof(P_CACHE));
+	memset(ret->piece_desc->cache, 0, 3 * sizeof(P_CACHE));
 
 	PIECE *first = (PIECE*)malloc(sizeof(PIECE));
 	first->file = ret;
@@ -620,8 +620,36 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 	size_t old;
 
 	if (cur_piece == NULL)
-		return -1;
-	if (P_INADD(cur_piece) && cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset)
+	{
+		//return -1;
+#ifdef DEBUG_ASSERT
+		assert(offset != 0);
+#endif
+
+		cur_piece = find_containing_piece(offset-1, buffer, &off);
+
+		if (cur_piece != NULL)
+		{
+			change_current(cur_piece, buffer);
+			if (P_INADD(cur_piece) && cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset)
+				goto redo;
+			piece_insert_right(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
+		}
+		else
+		{
+			cur_piece = find_containing_piece(offset + 1, buffer, &off);
+
+#ifdef DEBUG_ASSERT
+			assert(cur_piece != NULL);
+#endif
+			change_current(cur_piece, buffer);
+			piece_insert_left(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
+		}
+		goto exit;
+	}
+
+	if (P_INADD(cur_piece) && cur_piece->size + off == offset
+	    && cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset)
 	{
 	redo:
 	        old = cur_piece->size;
@@ -653,6 +681,7 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 	}
 	add_buffer_append(new_item, len, buffer);
 
+exit:
 	buffer->buffer_size += len;
 
 	return 0;
@@ -1039,13 +1068,30 @@ void change_current(PIECE *new_current, FILE_BUFFER *buffer)
 	P_CACHE *cache = buffer->piece_desc->cache;
 	if (new_current != cache[0].piece)
 	{
-		memset(cache, 0, CACHE_SIZE * sizeof(P_CACHE));
+		/*memset(cache, 0, CACHE_SIZE * sizeof(P_CACHE));
 		for (size_t i = 0; i < CACHE_SIZE && new_current != NULL; ++i)
 		{
 			cache[i].piece = new_current;
 			cache[i].offset = (i == 0) ? piece_offset(new_current) :
 				cache[i-1].offset + new_current->size;
 			new_current = (PIECE*)TreeSuccessor(buffer->piece_desc->tree, new_current->node)->info;
+			}*/
+
+		cache[CACHE_CURR].piece = new_current;
+		cache[CACHE_CURR].offset = piece_offset(new_current);
+
+		cache[CACHE_PREV].piece = (PIECE*)TreePredecessor(buffer->piece_desc->tree,
+								  new_current->node)->info;
+		if (cache[CACHE_PREV].piece != NULL)
+		{
+			cache[CACHE_PREV].offset = cache[CACHE_CURR].offset - cache[CACHE_PREV].piece->size;
+		}
+
+		cache[CACHE_NEXT].piece = (PIECE*)TreeSuccessor(buffer->piece_desc->tree,
+								  new_current->node)->info;
+		if (cache[CACHE_NEXT].piece != NULL)
+		{
+			cache[CACHE_NEXT].offset = cache[CACHE_CURR].offset + new_current->size;
 		}
 	}
 }

@@ -72,11 +72,20 @@ typedef struct _p_cache
 	size_t offset;
 } P_CACHE;
 
+#define CACHE_CURR 0
+#define CACHE_PREV 1
+#define CACHE_NEXT 2
+
+#define CURR_PIECE(a) (a->cache[0])
+#define PREV_PIECE(a) (a->cache[CACHE_PREV])
+#define NEXT_PIECE(a) (a->cache[CACHE_NEXT])
+
+
 typedef struct _piece_desc
 {
 	rb_red_blk_tree *tree;
 	//PIECE *current;
-	P_CACHE cache[CACHE_SIZE];
+	P_CACHE cache[3];
 } PIECE_DESC;
 
 //The size of the page is defined in common.h (normally 4096 bytes)
