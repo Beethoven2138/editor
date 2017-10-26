@@ -27,7 +27,7 @@ void loop(FILE_BUFFER *buffer)
 		}
 		else if (c & BACKSPACE_KEY)
 		{
-
+			line_delete_char(&y, &x, buffer);
 		}
 		else if (c & DELETE_KEY)
 		{
@@ -73,7 +73,7 @@ void loop(FILE_BUFFER *buffer)
 				assert(0);
 			}
 		}
-		print_lines(buffer->lines);
+		//print_lines(buffer->lines);
 		move(y,x);
 	}
 }

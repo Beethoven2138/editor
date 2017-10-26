@@ -112,6 +112,7 @@ typedef struct _line_table
 
 	char *gap;
 	size_t gap_len;
+	size_t gap_size;
 
 	char *span2;
 	size_t span2_len;
@@ -233,5 +234,7 @@ void goto_next_line(size_t *y, size_t *x, FILE_BUFFER *buffer);
 void goto_prev_line(size_t *y, size_t *x, FILE_BUFFER *buffer);
 void move_line_gap_fwd(size_t count, FILE_BUFFER *buffer);
 void move_line_gap_back(size_t count, FILE_BUFFER *buffer);
+
+void line_delete_char(size_t *y, size_t *x, FILE_BUFFER *buffer);
 
 #endif

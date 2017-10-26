@@ -68,3 +68,24 @@ void print_lines(LINE_TABLE *l_table)
 		}
 	}
 }
+
+void redraw_line(size_t line, LINE_TABLE *l_table)
+{
+	size_t len = l_table->line[line].len;
+	size_t off = line_off(line, l_table);
+	if (off >= l_table->gap - l_table->span1)
+		off += l_table->gap_len;
+	for (size_t i = 0; i < l_table->cols; i++)
+	{
+		if (i < len)
+		{
+			if (off == l_table->gap - l_table->span1)
+				off += l_table->gap_len;
+			mvaddch(line, i, l_table->span1[off++]);
+		}
+		else
+		{
+			mvaddch(line, i, ' ');
+		}
+	}
+}

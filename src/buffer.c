@@ -1,4 +1,4 @@
-/*  
+/*
     editor is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -74,7 +74,7 @@ FILE_BUFFER* init_buffer(char *input_file)
 	table->gap_len = GAP_SIZE;
 	table->span2 = table->span1 + GAP_SIZE;
 	table->span2_len = ret->buffer_size;
-
+	table->gap_size = GAP_SIZE;
 	/*ret->user_cache = (BUFFER*)malloc(sizeof(BUFFER));
 	ret->user_cache->buffer = (char*)malloc(10);
 	ret->user_cache->offset = 0;
@@ -198,10 +198,25 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 #endif
 		//table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
 		//table->gap_len = GAP_SIZE;
-		insert_item(table->gap-GAP_SIZE, GAP_SIZE, table->offset+table->span1_len-GAP_SIZE, buffer);
-	        table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
-		table->gap_len = GAP_SIZE;
+		insert_item(table->gap-table->gap_size,table->gap_size,
+			    table->offset+table->span1_len-table->gap_size, buffer);
+		if (table->span1_len + table->span2_len <= table->lines * table->cols)
+		{
+			table->span2 = memmove(table->span2+table->gap_size, table->span2, table->span2_len);
+			table->gap_len = table->gap_size;
+		}
+		else
+		{
+			size_t new_size = (table->lines*table->cols)-(table->span1_len+table->span2_len);
+#ifdef DEBUG_ASSERT
+			assert(new_size > 0);
+#endif
+			table->span2 = memmove(table->span2 + new_size, table->span2, table->span2_len);
+			table->gap_len = new_size;
+			table->gap_size = new_size;
+		}
 	}
+	bool line_draw = true;
 	if (table->line[*y_pos].len == table->cols)
 	{
 		--table->line[*y_pos].len;
@@ -217,19 +232,26 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 				table->line[i].len = table->line[i-1].len;
 				}*/
 		++table->line[(*y_pos)+1].len;
+		line_draw = false;
 	}
 
+	++(*x_pos);
+	++table->line[*y_pos].len;
+	if (*x_pos == table->cols)
 	{
-		++(*x_pos);
-		++table->line[*y_pos].len;
-		if (*x_pos == table->cols)
-		{
-			++(*y_pos);
-			*x_pos = 0;
+		++(*y_pos);
+		*x_pos = 0;
 #ifdef DEBUG_ASSERT
-			assert(*y_pos < table->lines);
+		assert(*y_pos < table->lines);
 #endif
-		}
+	}
+	if (line_draw)
+	{
+		redraw_line(*y_pos, table);
+	}
+	else
+	{
+		print_lines(table);
 	}
 }
 
@@ -240,16 +262,16 @@ void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 	assert(table->gap + table->gap_len + 1 < table->span2 + table->span2_len);
 	assert(table->span2_len > 0);
 #endif
-	if (table->gap_len < GAP_SIZE)
+	if (table->gap_len < table->gap_size)
 	{
-		size_t len = GAP_SIZE - table->gap_len;
+		size_t len = table->gap_size - table->gap_len;
 #ifdef DEBUG_ASSERT
 		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
 #else
 		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
 #endif
-		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
-		table->gap_len = GAP_SIZE;
+		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
+		table->gap_len = table->gap_size;
 #ifdef DEBUG_ASSERT
 		assert(table->span2_len - len > 0);
 #endif
@@ -275,16 +297,16 @@ void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 
 	//if (table->gap_len < GAP_SIZE
 
-	if (table->gap_len < GAP_SIZE)
+	if (table->gap_len < table->gap_size)
 	{
-		size_t len = GAP_SIZE - table->gap_len;
+		size_t len = table->gap_size - table->gap_len;
 #ifdef DEBUG_ASSERT
 		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
 #else
 		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
 #endif
-		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
-		table->gap_len = GAP_SIZE;
+		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
+		table->gap_len = table->gap_size;
 #ifdef DEBUG_ASSERT
 		assert(table->span2_len - len > 0);
 #endif
@@ -313,16 +335,16 @@ void goto_next_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
 #ifdef DEBUG_ASSERT
 	assert(*y < table->lines);
 #endif
-	if (table->gap_len < GAP_SIZE)
+	if (table->gap_len < table->gap_size)
 	{
-		size_t len = GAP_SIZE - table->gap_len;
+		size_t len = table->gap_size - table->gap_len;
 #ifdef DEBUG_ASSERT
 		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
 #else
 		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
 #endif
-		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
-		table->gap_len = GAP_SIZE;
+		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
+		table->gap_len = table->gap_size;
 #ifdef DEBUG_ASSERT
 		assert(table->span2_len - len > 0);
 #endif
@@ -344,16 +366,16 @@ void goto_prev_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
 #ifdef DEBUG_ASSERT
 	assert(*y < table->lines);
 #endif
-	if (table->gap_len < GAP_SIZE)
+	if (table->gap_len < table->gap_size)
 	{
-		size_t len = GAP_SIZE - table->gap_len;
+		size_t len = table->gap_size - table->gap_len;
 #ifdef DEBUG_ASSERT
 		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
 #else
 		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
 #endif
-		table->span2 = memmove(table->gap + GAP_SIZE, table->span2, table->span2_len);
-		table->gap_len = GAP_SIZE;
+		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
+		table->gap_len = table->gap_size;
 #ifdef DEBUG_ASSERT
 		assert(table->span2_len - len > 0);
 #endif
@@ -373,7 +395,7 @@ void move_line_gap_fwd(size_t count, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
 #ifdef DEBUG_ASSERT
-	assert(table->gap_len == GAP_SIZE);
+	assert(table->gap_len == table->gap_size);
 	assert(count <= table->span2_len);
 #endif
 	memcpy(table->gap, table->span2, count);
@@ -387,7 +409,7 @@ void move_line_gap_back(size_t count, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *table = buffer->lines;
 #ifdef DEBUG_ASSERT
-	assert(table->gap_len == GAP_SIZE);
+	assert(table->gap_len == table->gap_size);
 	assert(count <= table->span1_len);
 #endif
 	memcpy(table->span2-count, table->gap-count, count);
@@ -395,6 +417,72 @@ void move_line_gap_back(size_t count, FILE_BUFFER *buffer)
 	table->span2_len += count;
 	table->span1_len -= count;
 	table->gap -= count;
+}
+
+
+
+void line_delete_char(size_t *y, size_t *x, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *table = buffer->lines;
+	if (*y == 0 && *x == 0 && table->offset == 0)
+		return;
+	/*
+	  IMPORTANT!!!!!!!!!!
+	  If gap_len < gap_size, then the text before gap
+	  hasn't yet been added to the piece table.
+	 */
+	if (table->gap_len < table->gap_size)
+	{
+		size_t len = table->gap_size - table->gap_len;
+#ifdef DEBUG_ASSERT
+		assert(insert_item(table->gap-len,len-1,(table->gap-table->span1)+table->offset,buffer)==0);
+#else
+		insert_item(table->gap-len,len-1,table->gap-table->span1+table->offset,buffer);
+#endif
+	}
+	else
+	{
+		delete_item(table->offset+(table->gap-table->span1)-1, 1, buffer);
+	}
+#ifdef DEBUG_ASSERT
+	assert(table->span1 < table->gap);
+#endif
+	++table->gap_len;
+	if (table->gap_len > table->gap_size)
+		++table->gap_size;
+	--table->gap;
+	--table->span1_len;
+	if (*x == 0)
+	{
+#ifdef DEBUG_ASSERT
+		assert(table->offset == 0);
+#endif
+		size_t gap = table->cols - table->line[(*y)-1].len;
+		size_t amount = (table->line[*y].len >= gap) ? gap : table->line[*y].len;
+		table->line[(*y)-1].len += amount;
+		if (amount == table->line[*y].len)
+		{
+			size_t i;
+			for (i = *y; i < table->lines-1; ++i)
+			{
+				table->line[i].len = table->line[i+1].len;
+			}
+			table->used = i;
+		}
+		else
+		{
+			table->line[*y].len -= amount;
+		}
+		--(*y);
+		*x = table->line[*y].len;
+		print_lines(table);
+	}
+	else
+	{
+		--(*x);
+		--table->line[*y].len;
+		redraw_line(*y, table);
+	}
 }
 
 

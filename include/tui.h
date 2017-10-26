@@ -31,6 +31,7 @@ void end_tui(WIN_DESC *win);
 typedef struct _line_table LINE_TABLE;
 
 void print_lines(LINE_TABLE *l_table);
+void redraw_line(size_t line, LINE_TABLE *l_table);
 
 int get_char(void);
 
