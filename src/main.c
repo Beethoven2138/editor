@@ -1,10 +1,20 @@
 #include <buffer.h>
 #include <tui.h>
 #include <loop.h>
+#include <signal.h>
+
+FILE_BUFFER *buffer;
+
+void sigsegv_handler(void)
+{
+	for (;;);
+}
 
 int main(int argc, char *argv[])
 {
-	FILE_BUFFER *buffer = init_buffer("Makefile");
+	signal(SIGSEGV, sigsegv_handler);
+
+	buffer = init_buffer("Makefile");
 
 	//print_buffer(buffer);
 	/*end_tui(buffer);
