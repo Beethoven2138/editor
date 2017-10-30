@@ -2,6 +2,7 @@
 #include <tui.h>
 #include <loop.h>
 #include <signal.h>
+#include <term.h>
 
 FILE_BUFFER *buffer;
 
@@ -14,6 +15,22 @@ int main(int argc, char *argv[])
 {
 	signal(SIGSEGV, sigsegv_handler);
 
+	init_append_buf();
+	
+	term_raw_mode_on() == 0;
+
+	//term_clear_screen();
+	//term_cursor_forward(3);
+	term_erase_screen(1);
+	term_cursor_pos(35, 5, 1);
+
+	term_print_screen(1);
+
+	term_cursor_down(3, 1);
+
+	release_append_buf();	
+	return 0;
+	
 	buffer = init_buffer("Makefile");
 
 	//print_buffer(buffer);

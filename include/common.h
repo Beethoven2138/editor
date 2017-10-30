@@ -2,8 +2,11 @@
 #define COMMON_H
 
 #include <assert.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 #define BLOCK_SIZE 512
 #define PAGE_SIZE 4096

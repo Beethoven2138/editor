@@ -6,6 +6,7 @@ OBJECTS=obj/main.o \
 	obj/tui.o \
 	obj/common.o \
 	obj/loop.o \
+	obj/term.o \
 
 obj/%.o: src/%.c
 	mkdir -p $(@D)
