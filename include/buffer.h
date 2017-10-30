@@ -111,6 +111,7 @@ typedef struct _line
 {
 	//char buf[NR_COLS+1];/*only +1 for null-termination*/
 	size_t len;
+	bool new_line; /* Is there a new line character at the end?*/
 } LINE;
 
 typedef struct _line_table

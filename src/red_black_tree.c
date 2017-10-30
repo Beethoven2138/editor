@@ -80,7 +80,8 @@ void LeftRotate(rb_red_blk_tree* tree, rb_red_blk_node* x) {
 	y=x->right;
 
 	/* correct the sizes (only for this implementation)*/
-	((PIECE*)y->info)->size_left += ((PIECE*)x->info)->size + ((PIECE*)x->info)->size_left;
+	if (y->info != NULL && x->info != NULL)
+		((PIECE*)y->info)->size_left += ((PIECE*)x->info)->size + ((PIECE*)x->info)->size_left;
 
 	x->right=y->left;
 
@@ -139,7 +140,8 @@ void RightRotate(rb_red_blk_tree* tree, rb_red_blk_node* y) {
 	x=y->left;
 
 	/* correct the sizes (only for this implementation)*/
-	((PIECE*)y->info)->size_left -= ((PIECE*)x->info)->size + ((PIECE*)x->info)->size_left;
+	if (y->info != NULL && x->info != NULL)
+		((PIECE*)y->info)->size_left -= ((PIECE*)x->info)->size + ((PIECE*)x->info)->size_left;
 
 	y->left=x->right;
 

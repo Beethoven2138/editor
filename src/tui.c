@@ -56,15 +56,22 @@ void print_lines(LINE_TABLE *l_table)
 	        mvprintw(y, 0, l_table->line[y].buf);
 		}*/
 	size_t abs = 0;
-	for (size_t y = 0; y < l_table->used; ++y)
+	for (size_t y = 0; y < l_table->lines; ++y)
 	{
 		move(y, 0);
-		for (size_t i = 0; i < l_table->line[y].len; ++i)
+		if (y < l_table->used)
 		{
-			if (abs + l_table->span1 == l_table->gap)
-				abs += l_table->gap_len;
-			addch(*(l_table->span1 + abs));
-			++abs;
+			for (size_t i = 0; i < l_table->line[y].len; ++i)
+			{
+				if (abs + l_table->span1 == l_table->gap)
+					abs += l_table->gap_len;
+				addch(*(l_table->span1 + abs));
+				++abs;
+			}
+		}
+		else
+		{
+			addch('~');
 		}
 	}
 }

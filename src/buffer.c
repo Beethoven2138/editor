@@ -220,18 +220,21 @@ void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER
 	if (table->line[*y_pos].len == table->cols)
 	{
 		--table->line[*y_pos].len;
-		/*++(*y_pos);
-
-		for (size_t i = table->lines-1; i >= (*y_pos); --i)
+	        size_t i = (*y_pos)+1;
+		while (i < table->lines && table->line[i].len >= table->cols-1)
 		{
-			if (i == *y_pos)
-			{
-				table->line[i].len = 1;
-			}
-			else
-				table->line[i].len = table->line[i-1].len;
-				}*/
-		++table->line[(*y_pos)+1].len;
+			++i;
+		}
+		if (i >= table->lines)
+		{
+#ifdef DEBUG_ASSERT
+			assert(0);
+#endif
+		}
+		else
+		{
+			++table->line[i].len;
+		}
 		line_draw = false;
 	}
 
@@ -278,8 +281,15 @@ void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
 	}
         if (++(*x) > table->line[*y].len)
 	{
-		++(*y);
-		(*x) = 0;
+		if (*y >= table->used-1)
+		{
+			--(*x);
+		}
+		else
+		{
+			++(*y);
+			(*x) = 0;
+		}
 	}
 	else
 	{
@@ -439,6 +449,7 @@ void line_delete_char(size_t *y, size_t *x, FILE_BUFFER *buffer)
 #else
 		insert_item(table->gap-len,len-1,table->gap-table->span1+table->offset,buffer);
 #endif
+		table->gap_size = table->gap_len;
 	}
 	else
 	{
@@ -452,7 +463,7 @@ void line_delete_char(size_t *y, size_t *x, FILE_BUFFER *buffer)
 		++table->gap_size;
 	--table->gap;
 	--table->span1_len;
-	if (*x == 0)
+	if (*x == 0 && *y != 0)
 	{
 #ifdef DEBUG_ASSERT
 		assert(table->offset == 0);
@@ -544,15 +555,6 @@ PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off
 		{
 			ret = ret->left;
 		}
-		/*else
-		{
-			if (((PIECE*)ret->info)->size >= len)
-			{
-				*ret_off = cur_off;
-				return (PIECE*)ret->info;
-			}
-			return NULL;
-			}*/
 		else
 		{
 			if (ret_off != NULL)
@@ -958,8 +960,10 @@ void fill_lines(FILE_BUFFER *buffer, size_t offset)
 		if (c == 10 /*new line character*/)
 		{
 			l_table->line[lineno].len = i;
+			l_table->line[lineno].new_line = true;
 			i = 0;
 			++lineno;
+			l_table->line[lineno].new_line = false;
 		}
 		else
 		{
@@ -971,6 +975,7 @@ void fill_lines(FILE_BUFFER *buffer, size_t offset)
 				l_table->line[lineno].len = i;
 				i = 0;
 				++lineno;
+				l_table->line[lineno].new_line = false;
 			}
 		}
 	}
@@ -992,9 +997,7 @@ PIECE *piece_insert_left(size_t size, char flags, size_t span_off, FILE_BUFFER *
         PIECE *tmp = (PIECE*)ret->node->left->info;
 
 	if (tmp != NULL)
-	{
 		ret->size_left = tmp->size_left + tmp->size + tmp->size_right;
-	}
 	else
 		ret->size_left = 0;
 
@@ -1031,9 +1034,7 @@ PIECE *piece_insert_right(size_t size, char flags, size_t span_off, FILE_BUFFER 
         PIECE *tmp = (PIECE*)ret->node->left->info;
 
 	if (tmp != NULL)
-	{
 		ret->size_left = tmp->size_left + tmp->size + tmp->size_right;
-	}
 	else
 		ret->size_left = 0;
 
