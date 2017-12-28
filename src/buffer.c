@@ -64,33 +64,30 @@ FILE_BUFFER* init_buffer(char *input_file)
 	ret->win_desc = (WIN_DESC*)malloc(sizeof(WIN_DESC));
 
 	ret->lines = (LINE_TABLE*)malloc(sizeof(LINE_TABLE));
-
-	memset(ret->lines->line, 0, sizeof(LINE) * NR_LINES);
+	memset(ret->lines, 0, sizeof(LINE_TABLE));
 
 	LINE_TABLE *table = ret->lines;
-	table->span1 = (char*)malloc(NR_LINES * NR_COLS + GAP_SIZE);
-	table->span1_len = 0;
-	table->gap = table->span1;
-	table->gap_len = GAP_SIZE;
-	table->span2 = table->span1 + GAP_SIZE;
-	table->span2_len = ret->buffer_size;
-	table->gap_size = GAP_SIZE;
-	/*ret->user_cache = (BUFFER*)malloc(sizeof(BUFFER));
-	ret->user_cache->buffer = (char*)malloc(10);
-	ret->user_cache->offset = 0;
-	ret->user_cache->size = 10;*/
+	term_get_win_size(&table->rows, &table->cols);
+	table->lines_count = table->rows + LINE_CACHE_SIZE * 2;
+	//table->used = 22;
+	table->lines = (LINE*)malloc(sizeof(LINE) * table->lines_count);
+	memset(table->lines, 0, sizeof(LINE) * table->lines_count);
+	table->lines[0].start_piece = table->lines[0].end_piece = first;
 
+	ret->rendered = (char*)malloc(table->rows * table->cols);
 
 	init_tui(ret);
 
-	fill_lines(ret, 0);
+	fill_lines(ret, 1);
 
+	table->total_lines = get_line_count(ret);
+	
 	fclose(in_filp);
 
 	return ret;
 }
 
-int save_buffer(FILE_BUFFER *buffer, const char *file_name)
+/*int save_buffer(FILE_BUFFER *buffer, const char *file_name)
 {
 #ifdef DEBUG_ASSERT
 	assert(buffer->lines->gap_len == GAP_SIZE);
@@ -126,7 +123,7 @@ int save_buffer(FILE_BUFFER *buffer, const char *file_name)
 	}
 	fclose(fp);
 	return 0;
-}
+	}*/
 
 void release_buffer(FILE_BUFFER *buffer)
 {
@@ -155,10 +152,12 @@ void release_buffer(FILE_BUFFER *buffer)
 
 	free(buffer->win_desc);
 
-	free(buffer->lines->span1);
+	//free(buffer->lines->span1);
 
 	free(buffer->lines);
 
+	free(buffer->rendered);
+	
 	free(buffer);
 }
 /*
@@ -179,322 +178,6 @@ void user_cache_append(const char new_item, FILE_BUFFER *buffer)
 	}
 	cache->buffer[cache->offset++] = new_item;
 }*/
-
-void line_gap_add(const char new_item, size_t *y_pos, size_t *x_pos, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-#ifdef DEBUG_ASSERT
-	assert(table->span2_len > 0);
-#endif
-	*table->gap = new_item;
-	--table->gap_len;
-	++table->gap;
-	++table->span1_len;
-
-	if (table->gap_len == 0)
-	{
-#ifdef DEBUG_ASSERT
-		assert(table->span1_len + table->gap_len + table->span2_len <= NR_COLS * NR_LINES);
-#endif
-		//table->span2 = memmove(table->span2 + GAP_SIZE, table->span2, table->span2_len);
-		//table->gap_len = GAP_SIZE;
-		insert_item(table->gap-table->gap_size,table->gap_size,
-			    table->offset+table->span1_len-table->gap_size, buffer);
-		if (table->span1_len + table->span2_len <= table->lines * table->cols)
-		{
-			table->span2 = memmove(table->span2+table->gap_size, table->span2, table->span2_len);
-			table->gap_len = table->gap_size;
-		}
-		else
-		{
-			size_t new_size = (table->lines*table->cols)-(table->span1_len+table->span2_len);
-#ifdef DEBUG_ASSERT
-			assert(new_size > 0);
-#endif
-			table->span2 = memmove(table->span2 + new_size, table->span2, table->span2_len);
-			table->gap_len = new_size;
-			table->gap_size = new_size;
-		}
-	}
-	bool line_draw = true;
-	if (table->line[*y_pos].len == table->cols)
-	{
-		--table->line[*y_pos].len;
-	        size_t i = (*y_pos)+1;
-		while (i < table->lines && table->line[i].len >= table->cols-1)
-		{
-			++i;
-		}
-		if (i >= table->lines)
-		{
-#ifdef DEBUG_ASSERT
-			assert(0);
-#endif
-		}
-		else
-		{
-			++table->line[i].len;
-		}
-		line_draw = false;
-	}
-
-	++(*x_pos);
-	++table->line[*y_pos].len;
-	if (*x_pos == table->cols)
-	{
-		++(*y_pos);
-		*x_pos = 0;
-#ifdef DEBUG_ASSERT
-		assert(*y_pos < table->lines);
-#endif
-	}
-	if (line_draw)
-	{
-		redraw_line(*y_pos, table);
-	}
-	else
-	{
-		print_lines(table);
-	}
-}
-
-void inc_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-#ifdef DEBUG_ASSERT
-	assert(table->gap + table->gap_len + 1 < table->span2 + table->span2_len);
-	assert(table->span2_len > 0);
-#endif
-	if (table->gap_len < table->gap_size)
-	{
-		size_t len = table->gap_size - table->gap_len;
-#ifdef DEBUG_ASSERT
-		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
-#else
-		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
-#endif
-		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
-		table->gap_len = table->gap_size;
-#ifdef DEBUG_ASSERT
-		assert(table->span2_len - len > 0);
-#endif
-	}
-        if (++(*x) > table->line[*y].len)
-	{
-		if (*y >= table->used-1)
-		{
-			--(*x);
-		}
-		else
-		{
-			++(*y);
-			(*x) = 0;
-		}
-	}
-	else
-	{
-		++table->span1_len;
-		++table->gap;
-		--table->span2_len;
-		*(table->gap - 1) = *(table->span2);
-		*(table->span2++) = 0;
-	}
-}
-
-void dec_line_gap(size_t *y, size_t *x, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-
-	//if (table->gap_len < GAP_SIZE
-
-	if (table->gap_len < table->gap_size)
-	{
-		size_t len = table->gap_size - table->gap_len;
-#ifdef DEBUG_ASSERT
-		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
-#else
-		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
-#endif
-		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
-		table->gap_len = table->gap_size;
-#ifdef DEBUG_ASSERT
-		assert(table->span2_len - len > 0);
-#endif
-	}
-	if (*x == 0)
-	{
-		if (*y == 0)
-			return;
-		--(*y);
-		*x = table->line[*y].len;
-	}
-	else
-	{
-		--table->span1_len;
-		--table->gap;
-		++table->span2_len;
-		*(--table->span2) = *(table->gap);
-		memmove(table->gap, table->gap+1, table->gap_len);
-	        --(*x);
-	}
-}
-
-void goto_next_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-#ifdef DEBUG_ASSERT
-	assert(*y < table->lines);
-#endif
-	if (table->gap_len < table->gap_size)
-	{
-		size_t len = table->gap_size - table->gap_len;
-#ifdef DEBUG_ASSERT
-		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
-#else
-		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
-#endif
-		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
-		table->gap_len = table->gap_size;
-#ifdef DEBUG_ASSERT
-		assert(table->span2_len - len > 0);
-#endif
-	}
-	if (*y >= table->lines-1)
-		return;
-	size_t old_x = *x;
-	if (table->line[(*y)+1].len < *x)
-	{
-		*x = table->line[(*y)+1].len;
-	}
-	++(*y);
-	move_line_gap_fwd(table->line[(*y)-1].len-old_x+(*x), buffer);
-}
-
-void goto_prev_line(size_t *y, size_t *x, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-#ifdef DEBUG_ASSERT
-	assert(*y < table->lines);
-#endif
-	if (table->gap_len < table->gap_size)
-	{
-		size_t len = table->gap_size - table->gap_len;
-#ifdef DEBUG_ASSERT
-		assert(insert_item(table->gap-len,len,(table->gap-table->span1)+table->offset,buffer)==0);
-#else
-		insert_item(table->gap-len,len,table->gap-table->span1+table->offset,buffer);
-#endif
-		table->span2 = memmove(table->gap + table->gap_size, table->span2, table->span2_len);
-		table->gap_len = table->gap_size;
-#ifdef DEBUG_ASSERT
-		assert(table->span2_len - len > 0);
-#endif
-	}
-	if (*y == 0)
-		return;
-	size_t old_x = *x;
-	if (table->line[(*y)-1].len < *x)
-	{
-		*x = table->line[(*y)-1].len;
-	}
-	--(*y);
-	move_line_gap_back(old_x+(table->line[*y].len-(*x)), buffer);
-}
-
-void move_line_gap_fwd(size_t count, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-#ifdef DEBUG_ASSERT
-	assert(table->gap_len == table->gap_size);
-	assert(count <= table->span2_len);
-#endif
-	memcpy(table->gap, table->span2, count);
-	table->span2 += count;
-	table->span2_len -= count;
-	table->span1_len += count;
-	table->gap += count;
-}
-
-void move_line_gap_back(size_t count, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-#ifdef DEBUG_ASSERT
-	assert(table->gap_len == table->gap_size);
-	assert(count <= table->span1_len);
-#endif
-	memcpy(table->span2-count, table->gap-count, count);
-	table->span2 -= count;
-	table->span2_len += count;
-	table->span1_len -= count;
-	table->gap -= count;
-}
-
-
-
-void line_delete_char(size_t *y, size_t *x, FILE_BUFFER *buffer)
-{
-	LINE_TABLE *table = buffer->lines;
-	if (*y == 0 && *x == 0 && table->offset == 0)
-		return;
-	/*
-	  IMPORTANT!!!!!!!!!!
-	  If gap_len < gap_size, then the text before gap
-	  hasn't yet been added to the piece table.
-	 */
-	if (table->gap_len < table->gap_size)
-	{
-		size_t len = table->gap_size - table->gap_len;
-#ifdef DEBUG_ASSERT
-		assert(insert_item(table->gap-len,len-1,(table->gap-table->span1)+table->offset,buffer)==0);
-#else
-		insert_item(table->gap-len,len-1,table->gap-table->span1+table->offset,buffer);
-#endif
-		table->gap_size = table->gap_len;
-	}
-	else
-	{
-		delete_item(table->offset+(table->gap-table->span1)-1, 1, buffer);
-	}
-#ifdef DEBUG_ASSERT
-	assert(table->span1 < table->gap);
-#endif
-	++table->gap_len;
-	if (table->gap_len > table->gap_size)
-		++table->gap_size;
-	--table->gap;
-	--table->span1_len;
-	if (*x == 0 && *y != 0)
-	{
-#ifdef DEBUG_ASSERT
-		assert(table->offset == 0);
-#endif
-		size_t gap = table->cols - table->line[(*y)-1].len;
-		size_t amount = (table->line[*y].len >= gap) ? gap : table->line[*y].len;
-		table->line[(*y)-1].len += amount;
-		if (amount == table->line[*y].len)
-		{
-			size_t i;
-			for (i = *y; i < table->lines-1; ++i)
-			{
-				table->line[i].len = table->line[i+1].len;
-			}
-			table->used = i;
-		}
-		else
-		{
-			table->line[*y].len -= amount;
-		}
-		--(*y);
-		*x = table->line[*y].len;
-		print_lines(table);
-	}
-	else
-	{
-		--(*x);
-		--table->line[*y].len;
-		redraw_line(*y, table);
-	}
-}
 
 
 
@@ -564,54 +247,6 @@ PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off
 	}
 	return NULL;
 }
-
-/*
-  To insert an item:
-  Create a piece pointing to the items before the inserted one
-  Create a piece of the newly inserted item
-  Create a piece of the items after the newly inserted item
-*/
-//TODO: FIX SIZES
-/*int insert_item(const char *new_item, size_t len, size_t abs_size_left, FILE_BUFFER *buffer)
-{
-	size_t off;
-	PIECE *cur_piece = find_containing_piece(abs_size_left, buffer, &off);
-	if (cur_piece == NULL)
-		return -1;
-	if (cur_piece->flags & IN_FILE == 0
-	    && cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset-1)
-	{
-		size_t old = cur_piece->size;
-		cur_piece->size += len;
-		fix_sizes(cur_piece, old + len);
-	}
-	else
-	{
-		size_t old = cur_piece->size;
-		size_t old_off = cur_piece->offset;
-		//cur_piece->size = ;
-		size_t new = abs_size_left - off;
-		bool old_buf = cur_piece->flags;
-		delete_piece(cur_piece, buffer);
-		cur_piece = add_piece(off, 0, new, old_buf, old_off, buffer);
-
-
-		//fix_sizes(cur_piece, new - old);
-
-		cur_piece = add_piece(abs_size_left,cur_piece->size_right,
-				      len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
-
-		//TODO: Check all size_rights!!!!
-		cur_piece = add_piece(abs_size_left+cur_piece->size, cur_piece->size_right, old - new,
-				      old_buf, old_off + new, buffer);
-	}
-	add_buffer_append(new_item, len, buffer);
-
-	buffer->buffer_size += len;
-
-	return 0;
-}*/
-
 
 
 int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *buffer)
@@ -940,50 +575,6 @@ char buffer_readc(size_t offset, FILE_BUFFER *buffer)
 
 
 
-void fill_lines(FILE_BUFFER *buffer, size_t offset)
-{
-	size_t size = buffer->buffer_size;
-#ifdef DEBUG_ASSERT
-	Assert(offset < size, "In fill_lines. Offset >= size");
-#endif
-	LINE_TABLE *l_table = buffer->lines;
-	size_t lines = l_table->lines;
-	int lineno = 0;
-	int i = 0;
-	int abs_i = 0;
-	char c;
-	while (lineno < lines && offset < size)
-	{
-		c = buffer_readc(offset++, buffer);
-		if (abs_i + l_table->span1 == l_table->gap)
-			abs_i += l_table->gap_len;
-		if (c == 10 /*new line character*/)
-		{
-			l_table->line[lineno].len = i;
-			l_table->line[lineno].new_line = true;
-			i = 0;
-			++lineno;
-			l_table->line[lineno].new_line = false;
-		}
-		else
-		{
-			//l_table->line[lineno].buf[i++] = c;
-			l_table->span1[abs_i++] = c;
-			++i;
-			if (i >= l_table->cols)
-			{
-				l_table->line[lineno].len = i;
-				i = 0;
-				++lineno;
-				l_table->line[lineno].new_line = false;
-			}
-		}
-	}
-	buffer->lines->used = lineno + 1;
-}
-
-
-
 PIECE *piece_insert_left(size_t size, char flags, size_t span_off, FILE_BUFFER *buffer)
 {
 	PIECE *ret = (PIECE*)malloc(sizeof(PIECE));
@@ -1095,4 +686,355 @@ void change_current(PIECE *new_current, FILE_BUFFER *buffer)
 			cache[CACHE_NEXT].offset = cache[CACHE_CURR].offset + new_current->size;
 		}
 	}
+}
+
+/*
+  WARNING: THIS CAN ONLY BE USED WHEN THERE IS AT LEAST 1
+  VALID TABLE ENTRY IMMEDIATELY ABOVE IT
+ */
+size_t fill_lines_offset(FILE_BUFFER *buffer, size_t lineno, size_t table_offset, size_t count)
+{
+	LINE_TABLE *l_table = buffer->lines;
+	PIECE *start = l_table->lines[table_offset-1].end_piece;
+	size_t offset = l_table->lines[table_offset-1].end_offset;
+	char c;
+	size_t len;
+	size_t width = l_table->cols;
+
+	if (start != NULL && ++offset >= start->size)
+	{
+		offset = 0;
+		start = GET_NEXT_PIECE(start, buffer);
+	}
+
+	for (size_t i = table_offset; start != NULL && count > 0; ++i)
+	{
+		len = 0;
+
+		l_table->lines[i].start_piece = start;
+		l_table->lines[i].start_offset = offset;
+		l_table->lines[i].lineno = i + lineno;
+		l_table->lines[i].start_abs_offset = piece_offset(start) + offset;		
+
+		while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+		{
+			if (++offset >= start->size)
+			{
+				offset = 0;
+				start = GET_NEXT_PIECE(start, buffer);
+			}
+		}
+
+		l_table->lines[i].end_piece = start;
+		l_table->lines[i].end_offset = offset;
+		l_table->lines[i].length = len;
+
+		if (start != NULL && ++offset >= start->size)
+		{
+			offset = 0;
+			start = GET_NEXT_PIECE(start, buffer);
+		}
+		--count;
+	}
+	return count;
+}
+
+
+void fill_lines(FILE_BUFFER *buffer, size_t lineno)
+{
+	LINE_TABLE *l_table = buffer->lines;
+	PIECE *start;
+	size_t offset;
+	char c;
+	size_t len;
+	size_t width = l_table->cols;
+	l_table->used_above = (lineno > LINE_CACHE_SIZE) ? LINE_CACHE_SIZE : lineno - 1;
+	l_table->start_lineno = lineno - l_table->used_above;
+	/*if (l_table->start_lineno == 0 || l_table->start_lineno > lineno)*/
+	{
+		start = (PIECE*)TreeMin(buffer->piece_desc->tree)->info;
+		offset = 0;
+		for (size_t i = 1; start != NULL && i < l_table->start_lineno; ++i)
+		{
+			len = 0;
+			while (start != NULL &&
+			       (c = piece_read_c(start, start->offset + offset, buffer)) != 10 && ++len <= width)
+			{
+				if (++offset >= start->size)
+				{
+					offset = 0;
+				        start = GET_NEXT_PIECE(start, buffer);
+				}
+			}
+			if (start == NULL)
+				return;
+			if (++offset >= start->size)
+			{
+				offset = 0;
+				start = GET_NEXT_PIECE(start, buffer);
+			}
+			//l_table->lines[i-1].end_piece = end;
+		}
+	}
+	if (start == NULL)
+		return;
+	//else
+	{
+		size_t i;
+	        for (i = 0; start != NULL && i < l_table->rows+2*LINE_CACHE_SIZE; ++i)
+		{
+			len = 0;
+			l_table->lines[i].start_piece = start;
+			l_table->lines[i].start_offset = offset;
+			l_table->lines[i].lineno = i + lineno;
+			l_table->lines[i].start_abs_offset = piece_offset(start) + offset;
+
+			while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+			{
+				if (++offset >= start->size)
+				{
+					offset = 0;
+					start = GET_NEXT_PIECE(start, buffer);
+				}
+			}
+
+			l_table->lines[i].end_piece = start;
+			l_table->lines[i].end_offset = offset;
+			l_table->lines[i].length = len;
+
+		        if (start != NULL && ++offset >= start->size)
+			{
+				offset = 0;
+				start = GET_NEXT_PIECE(start, buffer);
+			}
+
+		}
+		i -= l_table->used_above;
+		l_table->used = (i > l_table->rows) ? l_table->rows : i;
+		l_table->used_bellow = i - l_table->used;
+	}
+}
+
+void inc_lineno(FILE_BUFFER *buffer)
+{
+	LINE_TABLE *l_table = buffer->lines;
+	if (l_table->used_bellow > 0)
+	{
+		++l_table->used_above;
+		--l_table->used_bellow;
+	}
+	else if (l_table->total_lines > l_table->start_lineno + l_table->used_above + l_table->used+1)
+	{
+		size_t cur_line = l_table->start_lineno + l_table->used_above + l_table->used;
+	        size_t diff = l_table->total_lines - cur_line;
+	        size_t delta = (diff > LINE_CACHE_SIZE) ? LINE_CACHE_SIZE: diff;
+		memmove(l_table->lines, l_table->lines + delta, sizeof(LINE) * (l_table->lines_count-delta));
+		fill_lines_offset(buffer, cur_line, l_table->used_above+l_table->used-delta, delta);
+		l_table->used_above -= delta-1;
+		l_table->used_bellow += delta-1;
+		l_table->start_lineno += delta-1;
+	}
+}
+
+//UNOPTOMIZED!!!
+void dec_lineno(FILE_BUFFER *buffer)
+{
+	LINE_TABLE *l_table = buffer->lines;
+	if (l_table->used_above > 0)
+	{
+		--l_table->used_above;
+		++l_table->used_bellow;
+	}
+	else if (l_table->start_lineno > 1)
+	{
+		size_t diff = l_table->start_lineno - 1;
+		size_t delta = (diff > LINE_CACHE_SIZE) ? LINE_CACHE_SIZE : diff;
+		//memmove(l_table->lines + delta, l_table->lines, sizeof(LINE) *(l_table->lines_count-delta));
+		fill_lines(buffer, l_table->start_lineno - delta);
+	}
+
+/*	if (l_table->used_bellow < LINE_CACHE_SIZE && l_table->used_above > 0)
+	{
+		{
+			++l_table->used_bellow;
+			--l_table->used_above;
+		}
+	}
+	else if (l_table->used_above > 0)
+	{
+		memmove(l_table->lines+1, l_table->lines, sizeof(LINE) * (l_table->lines_count-1));
+
+		/*if (l_table->start_lineno > 1)
+		{
+			fill_lines(buffer, l_table->lines[l_table->start_lineno-1].lineno);
+		}
+		--l_table->start_lineno;*
+		if (l_table->used_above + l_table->used + l_table->used_bellow == l_table->lines_count)
+		{
+			fill_lines(buffer, l_table->lines[l_table->start_lineno].lineno - 1);
+		}
+		else
+			--l_table->used_above;
+		--l_table->start_lineno;
+	}*/
+}
+
+void add_char_to_line(char c, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *l_table = buffer->lines;
+	size_t index = LINE_INDEX(l_table, CURSOR_Y(buffer));
+	size_t width = WIDTH(l_table);
+
+	insert_item(&c, 1, l_table->lines[index].start_abs_offset + CURSOR_X(buffer), buffer);
+
+	size_t len = 0;
+	PIECE *start = l_table->lines[index].start_piece;
+	size_t offset = l_table->lines[index].start_offset;
+	while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+	{
+		if (++offset >= start->size)
+		{
+			offset = 0;
+			start = GET_NEXT_PIECE(start, buffer);
+		}
+	}
+
+	l_table->lines[index].end_piece = start;
+	l_table->lines[index].end_offset = offset;
+
+	if (l_table->lines[index].length == width)
+	{
+		if (buffer->x == width-1)
+		{
+			if (buffer->y == HEIGHT(l_table) - 1)
+			{
+				if (l_table->used_bellow > 0)
+				{
+					inc_lineno(buffer);
+					
+				}
+				else
+				{
+					insert_item("\n", 1, buffer->buffer_size, buffer);
+					inc_lineno(buffer);
+				}
+			}
+			++buffer->y;
+			buffer->x = 0;
+		}
+		for (size_t i = index+1; start != NULL && i < TOTAL_LINES(l_table); ++i)
+		{
+			len = 0;
+			l_table->lines[i].start_piece = start;
+			l_table->lines[i].start_offset = offset;
+			l_table->lines[i].lineno = i + l_table->lines[index].lineno;
+			l_table->lines[i].start_abs_offset = piece_offset(start);
+
+			while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+			{
+				if (++offset >= start->size)
+				{
+					offset = 0;
+					start = GET_NEXT_PIECE(start, buffer);
+				}
+			}
+
+			l_table->lines[i].end_piece = start;
+			l_table->lines[i].end_offset = offset;
+			l_table->lines[i].length = len;
+
+		        if (start != NULL && ++offset >= start->size)
+			{
+				offset = 0;
+				start = GET_NEXT_PIECE(start, buffer);
+			}
+
+		}
+	}
+	else
+	{
+		++l_table->lines[index].length;
+	}
+}
+
+
+void get_rendered_output(char *dest, FILE_BUFFER *buffer)
+{
+	LINE_TABLE *l_table = buffer->lines;
+	size_t line = /*(l_table->start_lineno-1) +*/ l_table->used_above;
+	PIECE *piece;
+	size_t len;
+	LINE *lines = l_table->lines;
+	size_t cols = l_table->cols;
+	size_t size;
+	for (size_t i = 0; i < l_table->used; ++i)
+	{
+		len = 0;
+		piece = lines[line].start_piece;
+		while (piece != NULL && len < lines[line].length)
+		{
+			if (piece == lines[line].start_piece)
+			{
+				if (piece == lines[line].end_piece)
+				{
+					size = lines[line].end_offset - lines[line].start_offset;
+					piece_read(dest + i * cols + len, piece,
+						   piece->offset + lines[line].start_offset,
+						   size, buffer);
+				}
+				else
+				{
+					size = piece->size - lines[line].start_offset;
+				        piece_read(dest + i * cols + len, piece,
+						   piece->offset + lines[line].start_offset,
+						   size, buffer);
+					piece = GET_NEXT_PIECE(piece, buffer);
+				}
+			}
+			else if (piece == lines[line].end_piece)
+			{
+				size = lines[line].end_offset;
+				piece_read(dest + i * cols + len, piece,
+					   piece->offset, size, buffer);
+			}
+			else
+			{
+				size = piece->size;
+				piece_read(dest + i * cols + len, piece, piece->offset, size, buffer);
+				piece = GET_NEXT_PIECE(piece, buffer);
+			}
+			len += size;	
+		}
+		++line;
+	}
+}
+
+
+size_t get_line_count(FILE_BUFFER *buffer)
+{
+	size_t i, len;
+	size_t offset = 0;
+	char c;
+	size_t width = WIDTH(buffer->lines);
+	PIECE *start = GET_FIRST_PIECE(buffer);
+	for (i = 0; start != NULL; ++i)
+	{
+		len = 0;
+
+		while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+		{
+			if (++offset >= start->size)
+			{
+				offset = 0;
+				start = GET_NEXT_PIECE(start, buffer);
+			}
+		}
+
+		if (start != NULL && ++offset >= start->size)
+		{
+			offset = 0;
+			start = GET_NEXT_PIECE(start, buffer);
+		}
+	}
+	return i;
 }

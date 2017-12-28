@@ -51,5 +51,10 @@ void term_cursor_pos(int y, int x, char flags);
 void term_erase_screen(char flags);
 void term_print_screen(char flags);
 
+int term_get_win_size(size_t *rows, size_t *cols);
+int term_get_input(void);
+
+void init_append_buf(void);
+void release_append_buf(void);
 
 #endif

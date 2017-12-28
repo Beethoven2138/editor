@@ -22,7 +22,7 @@ void add_append_buf(const char *s, size_t count)
 	if (count > a_buf.size - a_buf.len)
 	{
 	        a_buf.size = a_buf.len + count;
-		a_buf.buf = (char*)(a_buf.buf, a_buf.size);
+		a_buf.buf = (char*)realloc(a_buf.buf, a_buf.size);
 	}
 	for (size_t i = 0; i < count; ++i)
 		*(a_buf.buf + a_buf.len++) = s[i];
@@ -200,7 +200,7 @@ void term_cursor_pos(int y, int x, char flags)
 	sprintf(tmp1, "%d", x);
 	tmp1[digits] = 'H';
 	add_append_buf(tmp1, digits+1);
-	if (flags && FLUSH)
+	if (flags & FLUSH)
 		flush_append_buf();
 }
 
@@ -213,7 +213,8 @@ void term_erase_screen(char flags)
 
 void term_print_screen(char flags)
 {
-	add_append_buf("hello", 5);
+	/*add_append_buf("hello", 5);
+	  add_append_buf("\033[i", 3);*/
 	add_append_buf("\033[i", 3);
 	if (flags & FLUSH)
 		flush_append_buf();
@@ -232,7 +233,8 @@ int term_get_input(void)
 {
 	int nread;
 	char c, seq[3];
-	while ((nread = read(fd,&c,1)) == 0);
+	while ((nread = read(STDIN_FILENO,&c,1)) == 0);
+	//while ((nread = read(STDIN_FILENO,seq,3)) == 0)
 	if (nread == -1) exit(1);
 
 	while(1)
@@ -241,10 +243,12 @@ int term_get_input(void)
 		{
 		case ESC:    /* escape sequence */
 			/* If this is just an ESC, we'll timeout here. */
-			if (read(fd,seq,1) == 0)
-				return ESC;
-			if (read(fd,seq+1,1) == 0)
-				return ESC;
+			if (read(STDIN_FILENO,seq,1) == 0)
+				return ESC_KEY;
+			if (read(STDIN_FILENO,seq+1,1) == 0)
+				return ESC_KEY;
+			/*if (seq[1] == 0 || seq[2] == 0)
+			  return ESC_KEY;*/
 
 			/* ESC [ sequences. */
 			if (seq[0] == '[')
@@ -252,14 +256,14 @@ int term_get_input(void)
 				if (seq[1] >= '0' && seq[1] <= '9')
 				{
 					/* Extended escape, read additional byte. */
-					if (read(fd,seq+2,1) == 0) return ESC;
+					if (read(STDIN_FILENO,seq+2,1) == 0) return ESC_KEY;
 					if (seq[2] == '~')
 					{
 						switch(seq[1])
 						{
 						case '3': return DEL_KEY;
-						case '5': return PAGE_UP;
-						case '6': return PAGE_DOWN;
+						case '5': return PAGE_UP_KEY;
+						case '6': return PAGE_DOWN_KEY;
 						}
 					}
 				} else
@@ -298,7 +302,8 @@ int term_get_win_size(size_t *rows, size_t *cols)
 	if (ioctl(1, TIOCGWINSZ, &win) == -1 || win.ws_col == 0)
 		return -1;
 	*cols = win.ws_col;
-	*row = win.ws_row;
+	*rows = win.ws_row;
+	return 0;
 }
 
 int get_cursor_pos(size_t *y, size_t *x)
@@ -308,12 +313,12 @@ int get_cursor_pos(size_t *y, size_t *x)
         unsigned int i = 0;
 
         // report cursor location
-        if (write(ofd, "\x1b[6n", 4) != 4) return -1;
+        if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
 
         // read the response: ESC [ rows; columns R
         while(i < sizeof(buf)-1)
 	{
-		if(read(ifd, buf+i, 1) != 1)
+		if(read(STDIN_FILENO, buf+i, 1) != 1)
 			break;
 		if(buf[i] == 'R')
 			break;
@@ -324,7 +329,7 @@ int get_cursor_pos(size_t *y, size_t *x)
         // parse it
         if (buf[0] != ESC || buf[1] != '[')
 		return -1;
-        if (sscanf(buf+2,"%d;%d",rows,columns) != 2)
+        if (sscanf(buf+2,"%u;%u",(unsigned int *)y,(unsigned int *)x) != 2)
 		return -1;
 	return 0;
 }

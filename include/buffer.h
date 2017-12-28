@@ -28,6 +28,11 @@
 
 #define SIZE(a) (a->buffer_size)
 
+#define GET_NEXT_PIECE(a, b) ((PIECE*)TreeSuccessor(b->piece_desc->tree, a->node)->info)
+#define GET_PREV_PIECE(a, b) ((PIECE*)TreePredecessor(b->piece_desc->tree, a->node)->info)
+#define GET_FIRST_PIECE(a) ((PIECE*)TreeMin(a->piece_desc->tree)->info)
+#define GET_LAST_PIECE(a) ((PIECE*)TreeMax(a->piece_desc->tree)->info)
+
 typedef struct _text
 {
 	char text[NR_TEXT];
@@ -110,44 +115,33 @@ typedef struct _buffer
 typedef struct _line
 {
 	//char buf[NR_COLS+1];/*only +1 for null-termination*/
-	size_t len;
-	bool new_line; /* Is there a new line character at the end?*/
+	//size_t len;
+	//bool new_line; /* Is there a new line character at the end?*/
+	PIECE *start_piece;
+	size_t start_offset;
+	PIECE *end_piece;
+	size_t end_offset;
+	char flags;
+	size_t length;
+	size_t lineno;
+	size_t start_abs_offset;
 } LINE;
 
 typedef struct _line_table
 {
-	size_t offset;
-	char *span1;
-	size_t span1_len;
-
-	char *gap;
-	size_t gap_len;
-	size_t gap_size;
-
-	char *span2;
-	size_t span2_len;
-
-	LINE line[NR_LINES];
-	size_t lines;
+	LINE *lines;
+	size_t lines_count;
+	size_t rows;
 	size_t cols;
 	size_t used; /*number of lines in use.
 		       will normally be == NR_LINES
 		       unless at bottom of file.
 		      */
+	size_t used_above;
+	size_t used_bellow;
+	size_t start_lineno;
+	size_t total_lines;
 } LINE_TABLE;
-
-static inline size_t line_off(size_t lineno, LINE_TABLE *table)
-{
-#ifdef DEBUG_ASSERT
-	assert(lineno < NR_LINES);
-#endif
-	size_t ret = 0;
-	for (size_t i = 0; i < lineno; ++i)
-	{
-		ret += table->line[i].len;
-	}
-	return ret;
-}
 
 typedef struct _win_desc WIN_DESC;
 
@@ -169,6 +163,8 @@ typedef struct _file_buffer
 	/*for text*/
 	size_t x;
 	size_t y;
+
+	char *rendered;
 } FILE_BUFFER;
 
 FILE_BUFFER* init_buffer(char *input_file);
@@ -201,7 +197,7 @@ size_t abs_off_to_size_left(PIECE *piece);
 
 ssize_t buffer_read(char *dest, size_t offset, size_t count, FILE_BUFFER *buffer);
 
-void fill_lines(FILE_BUFFER *buffer, size_t offset);
+void fill_lines(FILE_BUFFER *buffer, size_t lineno);
 
 PIECE *piece_insert_left(size_t size, char flags, size_t span_off, FILE_BUFFER *buffer);
 PIECE *piece_insert_right(size_t size, char flags, size_t span_off, FILE_BUFFER *buffer);
@@ -246,5 +242,39 @@ void move_line_gap_fwd(size_t count, FILE_BUFFER *buffer);
 void move_line_gap_back(size_t count, FILE_BUFFER *buffer);
 
 void line_delete_char(size_t *y, size_t *x, FILE_BUFFER *buffer);
+
+static inline char piece_read_c(PIECE *piece, size_t offset, FILE_BUFFER *buffer)
+{
+	return GET_BUFFER(buffer, piece->flags)[offset];
+}
+
+static inline size_t piece_read(char *dest, PIECE *piece, size_t offset, size_t count, FILE_BUFFER *buffer)
+{
+	char *buf = GET_BUFFER(buffer, piece->flags);
+	memcpy(dest, buf + offset, count);
+	return count;
+}
+
+void get_rendered_output(char *dest, FILE_BUFFER *buffer);
+
+void inc_lineno(FILE_BUFFER *buffer);
+void dec_lineno(FILE_BUFFER *buffer);
+
+
+size_t get_line_count(FILE_BUFFER *buffer);
+
+size_t fill_lines_offset(FILE_BUFFER *buffer, size_t lineno, size_t table_offset, size_t count);
+
+
+void add_char_to_line(char c, FILE_BUFFER *buffer);
+
+
+#define CURRENT_LINE(a) (a->y + a->lines->start_lineno + a->lines->used_above)
+#define CURSOR_X(a) (a->x)
+#define CURSOR_Y(a) (a->y)
+#define LINE_INDEX(a, y) (a->used_above + y)
+#define WIDTH(a) (a->cols)
+#define HEIGHT(a) (a->rows)
+#define TOTAL_LINES(a) (a->lines_count)
 
 #endif

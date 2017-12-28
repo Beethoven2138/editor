@@ -5,7 +5,7 @@
 #include <common.h>
 #include <tui.h>
 
-#define ERROR 0x80000000
+/*#define ERROR 0x80000000
 
 #define F_KEY 0x40000000
 
@@ -19,7 +19,7 @@
 #define ESCAPE_KEY 0x800000
 #define ARROW 0x400000
 
-#define NORMAL 0x200000
+#define NORMAL 0x200000*/
 
 typedef struct _file_buffer FILE_BUFFER;
 

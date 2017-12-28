@@ -23,10 +23,49 @@
 
 #define MAGIC 0xBAD1234
 
+#define LINE_CACHE_SIZE 10 /*number of lines that will be copied 
+			     before and after the visible lines*/
+
 /* comment out the line below to remove all the debugging assertion */
 /* checks from the compiled code.  */
 #define DEBUG_ASSERT 1
 
 void Assert(int assertion, char *error);
+
+
+
+enum
+{
+	
+	HOME_KEY=0,
+	END_KEY=1,
+	ESC_KEY=2,
+	PAGE_UP_KEY=3,
+	PAGE_DOWN_KEY=4,
+	BACKSPACE_KEY = 8,
+        TAB_KEY = 9,
+	ENTER_KEY = 10,
+	ESCAPE_KEY = 27,
+
+	DEL_KEY = 127,
+
+	ARROW_UP = 256,
+	ARROW_DOWN = 257,
+	ARROW_RIGHT = 258,
+	ARROW_LEFT = 259,
+
+	F1_KEY = 260,
+	F2_KEY=261,
+	F3_KEY=262,
+	F4_KEY=263,
+	F5_KEY=264,
+	F6_KEY=265,
+	F7_KEY=267,
+	F8_KEY=268,
+	F9_KEY=269,
+	F10_KEY=270,
+	F11_KEY=280,
+	F12_KEY=281,
+};
 
 #endif
