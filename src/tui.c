@@ -66,7 +66,8 @@ void print_lines(FILE_BUFFER *buffer)
 
 	for (size_t i = 0; i < l_table->used; ++i)
 	{
-		move(i+1, 0);
+		//move(i+1, 0);
+		term_cursor_pos(i+1, 0, 0);
 		add_append_buf(buffer->rendered+l_table->cols*i, l_table->lines[start + i].length);
 	}
 

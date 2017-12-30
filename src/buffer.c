@@ -293,28 +293,42 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 		cur_piece->size += len;
 		fix_sizes(cur_piece, len);
 	}
-	else if (offset - off == 0 && piece_offset(cur_piece) > 0)
+/*	else if (offset - off == 0 && piece_offset(cur_piece) > 0 &&
+		 cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset)
 	{
-	        cur_piece = (PIECE*)TreePredecessor(buffer->piece_desc->tree, cur_piece->node)->info;
+	        /*cur_piece = GET_PREV_PIECE(cur_piece, buffer);
 		if (P_INADD(cur_piece) && cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset)
 			goto redo;
-		goto fail;
-	}
+		cur_piece = GET_NEXT_PIECE(cur_piece, buffer);
+		goto fail;*
+		
+	}*/
 	else
 	{
 	fail:
 		change_current(cur_piece, buffer);
 	        old = cur_piece->size;
 		size_t old_off = cur_piece->offset;
-		size_t new = offset - off;
 		char old_flags = cur_piece->flags;
 		size_t old_pos = off;
-		cur_piece->size = new;
-		fix_sizes(cur_piece, (int)new - (int)old);
+		size_t new = offset - off;
+		if (new > 0)
+		{
+			cur_piece->size = new;
+			fix_sizes(cur_piece, (int)new - (int)old);
 
-		cur_piece = piece_insert_right(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
-		change_current(cur_piece, buffer);
-		piece_insert_right(/*old - offset - len*/old-new, old_flags, old_off + new, buffer);
+			cur_piece = piece_insert_right(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
+			change_current(cur_piece, buffer);
+			piece_insert_right(/*old - offset - len*/old-new, old_flags, old_off + new, buffer);
+		}
+		else
+		{
+			cur_piece = GET_PREV_PIECE(cur_piece, buffer);
+			off -= cur_piece->size;
+			goto fail;
+			//piece_insert_left(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
+		}
+		
 	}
 	add_buffer_append(new_item, len, buffer);
 
@@ -716,10 +730,12 @@ size_t fill_lines_offset(FILE_BUFFER *buffer, size_t lineno, size_t table_offset
 		l_table->lines[i].lineno = i + lineno;
 		l_table->lines[i].start_abs_offset = piece_offset(start) + offset;		
 
-		while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+		while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len <= width+1)
 		{
 			if (++offset >= start->size)
 			{
+				if (start->size == 0)
+					--len;
 				offset = 0;
 				start = GET_NEXT_PIECE(start, buffer);
 			}
@@ -739,7 +755,6 @@ size_t fill_lines_offset(FILE_BUFFER *buffer, size_t lineno, size_t table_offset
 	return count;
 }
 
-
 void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 {
 	LINE_TABLE *l_table = buffer->lines;
@@ -758,7 +773,7 @@ void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 		{
 			len = 0;
 			while (start != NULL &&
-			       (c = piece_read_c(start, start->offset + offset, buffer)) != 10 && ++len <= width)
+			       (c = piece_read_c(start, start->offset + offset, buffer)) != 10 && ++len <= width+1)
 			{
 				if (++offset >= start->size)
 				{
@@ -793,6 +808,8 @@ void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 			{
 				if (++offset >= start->size)
 				{
+					if (start->size == 0)
+						--len;
 					offset = 0;
 					start = GET_NEXT_PIECE(start, buffer);
 				}
@@ -802,7 +819,7 @@ void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 			l_table->lines[i].end_offset = offset;
 			l_table->lines[i].length = len;
 
-		        if (start != NULL && ++offset >= start->size)
+		        if (start != NULL && c == 10 && ++offset >= start->size)
 			{
 				offset = 0;
 				start = GET_NEXT_PIECE(start, buffer);
@@ -882,15 +899,15 @@ void dec_lineno(FILE_BUFFER *buffer)
 void add_char_to_line(char c, FILE_BUFFER *buffer)
 {
 	LINE_TABLE *l_table = buffer->lines;
-	size_t index = LINE_INDEX(l_table, CURSOR_Y(buffer));
+	size_t index = LINE_INDEX(l_table, CURSOR_Y(buffer)-1);
 	size_t width = WIDTH(l_table);
 
-	insert_item(&c, 1, l_table->lines[index].start_abs_offset + CURSOR_X(buffer), buffer);
+	insert_item(&c, 1, l_table->lines[index].start_abs_offset + CURSOR_X(buffer)+2, buffer);
 
 	size_t len = 0;
 	PIECE *start = l_table->lines[index].start_piece;
 	size_t offset = l_table->lines[index].start_offset;
-	while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+/*	while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
 	{
 		if (++offset >= start->size)
 		{
@@ -901,8 +918,13 @@ void add_char_to_line(char c, FILE_BUFFER *buffer)
 
 	l_table->lines[index].end_piece = start;
 	l_table->lines[index].end_offset = offset;
-
-	if (l_table->lines[index].length == width)
+*/
+/*	if (index > 0)
+	fill_lines_offset(buffer, l_table->lines[index].lineno, index, l_table->lines_count - index - 1);*/
+//	else
+	fill_lines(buffer, l_table->start_lineno+l_table->used_above);
+		
+/*	if (l_table->lines[index].length == width)
 	{
 		if (buffer->x == width-1)
 		{
@@ -951,9 +973,9 @@ void add_char_to_line(char c, FILE_BUFFER *buffer)
 
 		}
 	}
-	else
+	else*/
 	{
-		++l_table->lines[index].length;
+		//	++l_table->lines[index].length;
 	}
 }
 
@@ -994,6 +1016,8 @@ void get_rendered_output(char *dest, FILE_BUFFER *buffer)
 			else if (piece == lines[line].end_piece)
 			{
 				size = lines[line].end_offset;
+				if (size == 0)
+					break;
 				piece_read(dest + i * cols + len, piece,
 					   piece->offset, size, buffer);
 			}

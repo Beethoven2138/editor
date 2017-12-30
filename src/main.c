@@ -13,7 +13,7 @@ void sigsegv_handler(void)
 
 int main(int argc, char *argv[])
 {
-	signal(SIGSEGV, sigsegv_handler);
+	//signal(SIGSEGV, sigsegv_handler);
 
 //	init_append_buf();
 	

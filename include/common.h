@@ -45,7 +45,6 @@ enum
 	BACKSPACE_KEY = 8,
         TAB_KEY = 9,
 	ENTER_KEY = 10,
-	ESCAPE_KEY = 27,
 
 	DEL_KEY = 127,
 

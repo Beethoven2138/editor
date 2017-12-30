@@ -1,11 +1,18 @@
 #include <loop.h>
 
+void test(void)
+{
+	int a = 5;
+}
+
 void loop(FILE_BUFFER *buffer)
 {
 	print_lines(buffer);
 	int c;
 	size_t *y = &buffer->y;
 	size_t *x = &buffer->x;
+	*y = 1;
+	*x = 1;
 	size_t *width = &buffer->lines->cols;
 	size_t *height = &buffer->lines->rows;
 	move(*y, *x);
@@ -19,7 +26,7 @@ void loop(FILE_BUFFER *buffer)
 		{
 			if (c == ARROW_UP)
 			{
-				if (*y > 0)
+				if (*y > 1)
 				        --(*y);
 				else
 					dec_lineno(buffer);
@@ -32,11 +39,18 @@ void loop(FILE_BUFFER *buffer)
 					inc_lineno(buffer);
 			}
 		}
-		else if (c == 32)
+		else if (c == ESC_KEY)
 			break;
+		else if (c == END_KEY)
+		{
+			test();
+			//int a = 4;
+		}
 		print_lines(buffer);
 		move(*y,*x);
 	}
+	term_erase_screen(0);
+	move(1,1);
 /*	while (c = get_char())
 	{
 		move(y,x);
