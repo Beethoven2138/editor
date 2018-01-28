@@ -18,9 +18,14 @@ void loop(FILE_BUFFER *buffer)
 	move(*y, *x);
 	while (c = get_char())
 	{
-		if (c >= 32 && c <= 126)
+		if ((c >= 32 && c <= 126) || c == 9 || c == 10)
 		{
 			add_char_to_line(c, buffer);
+		}
+		else if (c >= F1_KEY && c <= F12_KEY)
+		{
+			if (c == F5_KEY)
+				save_buffer(buffer);
 		}
 		else if (c >= ARROW_UP && c <= ARROW_LEFT)
 		{
@@ -30,13 +35,63 @@ void loop(FILE_BUFFER *buffer)
 				        --(*y);
 				else
 					dec_lineno(buffer);
+				LINE *current = CURRENT_LINE(buffer->lines, *y);
+				if (*x >= current->length)
+					*x = current->length+1;
 			}
 			else if (c == ARROW_DOWN)
 			{
-				if (*y < *height)
+				if (*y < buffer->lines->used)
 					++(*y);
 				else
 					inc_lineno(buffer);
+				LINE *current = CURRENT_LINE(buffer->lines, *y);
+				if (*x >= current->length)
+					*x = current->length+1;
+			}
+			else if (c == ARROW_LEFT)
+			{
+				--(*x);
+				if (*x == 0)
+				{
+					if (*y > 1 || buffer->lines->start_lineno > 1 ||
+					    buffer->lines->used_above > 0)
+					{
+						if (*y > 2)
+							--(*y);
+						else
+							dec_lineno(buffer);
+						LINE *current = CURRENT_LINE(buffer->lines, *y);
+						*x = current->length+1;
+					}
+					else ++(*x);
+				}
+			}
+			else if (c == ARROW_RIGHT)
+			{
+				if (buffer->rendered[(*y)*(*width)+(*x)-1] != 9)
+					++(*x);
+				else
+					*x += buffer->settings.tab_length;
+				if (CURRENT_LINE(buffer->lines, *y)->length+1 < *x)
+				{
+					if (++(*y) >= *height)
+					{
+						if (inc_lineno(buffer) == -1)
+						{
+							*y = *height;
+						}
+						else
+						{
+							//--(*y);
+							*x = 1;
+						}
+					}
+					else
+					{
+						*x = 1;
+					}
+				}
 			}
 		}
 		else if (c == ESC_KEY)

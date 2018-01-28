@@ -241,6 +241,8 @@ int term_get_input(void)
 	{
 		switch(c)
 		{
+		case 13:
+			return 10;
 		case ESC:    /* escape sequence */
 			/* If this is just an ESC, we'll timeout here. */
 			if (read(STDIN_FILENO,seq,1) == 0)

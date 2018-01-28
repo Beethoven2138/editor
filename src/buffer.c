@@ -25,6 +25,8 @@ FILE_BUFFER* init_buffer(char *input_file)
 
 	FILE_BUFFER *ret = (FILE_BUFFER*)malloc(sizeof(FILE_BUFFER));
 
+	init_settings(&ret->settings);
+
 	ret->name_len = strlen(input_file);
 	ret->name = (char*)malloc(ret->name_len);
 	strncpy(ret->name, input_file, ret->name_len);
@@ -35,8 +37,10 @@ FILE_BUFFER* init_buffer(char *input_file)
 
 	ret->buffer_size = ret->status->st_size;
 
-	ret->file_buf = mmap(NULL, ret->status->st_size,
-			     PROT_READ, MAP_PRIVATE/* | MAP_HUGETLB*/, fileno(in_filp), 0);
+	ret->file_buf = malloc(ret->buffer_size);
+	fread(ret->file_buf, 1, ret->buffer_size, in_filp);
+	/*ret->file_buf = mmap(NULL, ret->status->st_size,
+			     PROT_READ | PROT_WRITE, MAP_SHARED, fileno(in_filp), 0);*/
 
 	ret->add_buf = (BUFFER*)malloc(sizeof(BUFFER));
 	ret->add_buf->size = PAGE_SIZE;
@@ -50,6 +54,17 @@ FILE_BUFFER* init_buffer(char *input_file)
 	ret->piece_desc->tree = RBTreeCreate(piece_compare, key_destroy, info_destroy);
 	memset(ret->piece_desc->cache, 0, 3 * sizeof(P_CACHE));
 
+	/*PIECE *nill = (PIECE*)malloc(sizeof(PIECE));
+	nill->file = ret;
+	nill->flags = INFO | KEY | NILL;
+	nill->offset = 0;
+	nill->size_left = 0;
+	nill->size_right = ret->status->st_size;
+	nill->size = 0;
+	nill->node = RBTreeInsert(ret->piece_desc->tree, (void*)nill, (void*)nill);
+	
+	change_current(nill, ret);*/
+
 	PIECE *first = (PIECE*)malloc(sizeof(PIECE));
 	first->file = ret;
 	first->flags = IN_FILE | INFO | KEY;
@@ -57,10 +72,17 @@ FILE_BUFFER* init_buffer(char *input_file)
 	first->size_left = 0;
 	first->size_right = 0;
 	first->size = ret->status->st_size;
+/*	first->node = (rb_red_blk_node*)malloc(sizeof(rb_red_blk_node));
+	first->node->info = first->node->key = (void*)first;
+	first->node->parent = nill->node;
+	first->node->red = 1;
+	first->node->left = ret->piece_desc->tree->nil;
+	first->node->right = ret->piece_desc->tree->nil;
+	nill->node->right = first->node;*/
 	first->node = RBTreeInsert(ret->piece_desc->tree, (void*)first, (void*)first);
-
+	//first->node = insert_left(ret->piece_desc->tree, nill->node);
 	change_current(first, ret);
-
+	//nill->node->left = ret->piece_desc->tree->nil;
 	ret->win_desc = (WIN_DESC*)malloc(sizeof(WIN_DESC));
 
 	ret->lines = (LINE_TABLE*)malloc(sizeof(LINE_TABLE));
@@ -81,58 +103,37 @@ FILE_BUFFER* init_buffer(char *input_file)
 	fill_lines(ret, 1);
 
 	table->total_lines = get_line_count(ret);
-	
-	fclose(in_filp);
+
+	ret->filp = in_filp;
+
+	ret->dirty = 0;
 
 	return ret;
 }
 
-/*int save_buffer(FILE_BUFFER *buffer, const char *file_name)
+int save_buffer(FILE_BUFFER *buffer)
 {
-#ifdef DEBUG_ASSERT
-	assert(buffer->lines->gap_len == GAP_SIZE);
-#endif
-	PIECE_DESC *desc = buffer->piece_desc;
-
-	PIECE *piece = (PIECE*)TreeMin(desc->tree)->info;
-
-	char *add_buf = buffer->add_buf->buffer;
-
-	FILE *fp = fopen(file_name, "w+");
-
-	if (fp == NULL)
-		return -1;
-
-        while (piece != NULL)
+	FILE *fp = buffer->filp;
+	for (PIECE *piece = GET_FIRST_PIECE(buffer); piece != NULL; piece = GET_NEXT_PIECE(piece, buffer))
 	{
-		if ((piece->flags & 8) == 8)
-		{
-		        for (size_t off = 0; off < piece->size; ++off)
-			{
-				fputc(buffer->file_buf[piece->offset + off], fp);
-			}
-		}
-		else
-		{
-			for (size_t off = 0; off < piece->size; ++off)
-			{
-				fputc(add_buf[piece->offset + off], fp);
-			}
-		}
-	        piece = (PIECE*)(TreeSuccessor(desc->tree, piece->node)->info);
+		fwrite(GET_BUFFER(buffer, piece->flags)+piece->offset, 1, piece->size, fp);
 	}
-	fclose(fp);
-	return 0;
-	}*/
+}
+
+
+void init_settings(SETTINGS *settings)
+{
+	settings->tab_length = 8;
+}
 
 void release_buffer(FILE_BUFFER *buffer)
 {
 	if (!buffer)
 		return;
 
-	munmap(buffer->file_buf, buffer->status->st_size);
+	//munmap(buffer->file_buf, buffer->status->st_size);
 
-
+	free(buffer->file_buf);
 	BUFFER *add_buf = ADD_BUF(buffer);
 
 	free(add_buf->buffer);
@@ -157,7 +158,7 @@ void release_buffer(FILE_BUFFER *buffer)
 	free(buffer->lines);
 
 	free(buffer->rendered);
-	
+	fclose(buffer->filp);
 	free(buffer);
 }
 /*
@@ -216,8 +217,8 @@ size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer)
 PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off)
 {
 	/*P_CACHE *tmp = find_in_cache_off(offset, buffer);
-	if (tmp != NULL)
-	return tmp->piece;*/
+	  if (tmp != NULL)
+	  return tmp->piece;*/
 	//TODO: situation when len overlaps multiple pieces
 	rb_red_blk_node *ret = buffer->piece_desc->tree->root->left;
 
@@ -238,12 +239,14 @@ PIECE *find_containing_piece(size_t offset, FILE_BUFFER *buffer, size_t *ret_off
 		{
 			ret = ret->left;
 		}
-		else
+		else if (((PIECE*)ret->info)->size > 0)
 		{
 			if (ret_off != NULL)
 				*ret_off = cur_off;
 			return (PIECE*)ret->info;
 		}
+		else
+			ret = ret->left;
 	}
 	return NULL;
 }
@@ -289,6 +292,10 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 	    && cur_piece->size + cur_piece->offset == ADD_BUF(buffer)->offset)
 	{
 	redo:
+		/*if (piece->flags & NILL)
+		{
+			piece->flags && 
+			}*/
 	        old = cur_piece->size;
 		cur_piece->size += len;
 		fix_sizes(cur_piece, len);
@@ -323,10 +330,16 @@ int insert_item(const char *new_item, size_t len, size_t offset, FILE_BUFFER *bu
 		}
 		else
 		{
-			cur_piece = GET_PREV_PIECE(cur_piece, buffer);
+			//	if (cur_piece->flags & NILL == 0)
+			{	cur_piece = GET_PREV_PIECE(cur_piece, buffer);
 			off -= cur_piece->size;
 			goto fail;
-			//piece_insert_left(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
+			}
+			/*	else
+			{
+				cur_piece->flags &= ~NILL;
+				piece_insert_left(len, IN_ADD, ADD_BUF(buffer)->offset, buffer);
+				}*/
 		}
 		
 	}
@@ -773,7 +786,8 @@ void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 		{
 			len = 0;
 			while (start != NULL &&
-			       (c = piece_read_c(start, start->offset + offset, buffer)) != 10 && ++len <= width+1)
+			       (c = piece_read_c(start, start->offset + offset, buffer)) != 10 &&
+			       ((c == 9) ? len += buffer->settings.tab_length : ++len) <= width+1)
 			{
 				if (++offset >= start->size)
 				{
@@ -804,7 +818,7 @@ void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 			l_table->lines[i].lineno = i + lineno;
 			l_table->lines[i].start_abs_offset = piece_offset(start) + offset;
 
-			while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
+			while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ((c == 9) ? len += buffer->settings.tab_length : ++len) < width+1)
 			{
 				if (++offset >= start->size)
 				{
@@ -832,13 +846,14 @@ void fill_lines(FILE_BUFFER *buffer, size_t lineno)
 	}
 }
 
-void inc_lineno(FILE_BUFFER *buffer)
+int inc_lineno(FILE_BUFFER *buffer)
 {
 	LINE_TABLE *l_table = buffer->lines;
 	if (l_table->used_bellow > 0)
 	{
 		++l_table->used_above;
 		--l_table->used_bellow;
+		return 0;
 	}
 	else if (l_table->total_lines > l_table->start_lineno + l_table->used_above + l_table->used+1)
 	{
@@ -850,7 +865,9 @@ void inc_lineno(FILE_BUFFER *buffer)
 		l_table->used_above -= delta-1;
 		l_table->used_bellow += delta-1;
 		l_table->start_lineno += delta-1;
+		return 0;
 	}
+	return -1;
 }
 
 //UNOPTOMIZED!!!
@@ -898,11 +915,12 @@ void dec_lineno(FILE_BUFFER *buffer)
 
 void add_char_to_line(char c, FILE_BUFFER *buffer)
 {
+	buffer->dirty = 1;
 	LINE_TABLE *l_table = buffer->lines;
 	size_t index = LINE_INDEX(l_table, CURSOR_Y(buffer)-1);
 	size_t width = WIDTH(l_table);
-
-	insert_item(&c, 1, l_table->lines[index].start_abs_offset + CURSOR_X(buffer)+2, buffer);
+	//size_t current_lineno = l_table->start_lineno + index;
+	insert_item(&c, 1, l_table->lines[index].start_abs_offset + CURSOR_X(buffer)-1, buffer);
 
 	size_t len = 0;
 	PIECE *start = l_table->lines[index].start_piece;
@@ -923,17 +941,19 @@ void add_char_to_line(char c, FILE_BUFFER *buffer)
 	fill_lines_offset(buffer, l_table->lines[index].lineno, index, l_table->lines_count - index - 1);*/
 //	else
 	fill_lines(buffer, l_table->start_lineno+l_table->used_above);
-		
-/*	if (l_table->lines[index].length == width)
+	if (c != 10)
 	{
-		if (buffer->x == width-1)
+		if (c != 9)
+			++buffer->x;
+		else
+			buffer->x += buffer->settings.tab_length;
+		if (buffer->x == width+1)
 		{
 			if (buffer->y == HEIGHT(l_table) - 1)
 			{
 				if (l_table->used_bellow > 0)
 				{
-					inc_lineno(buffer);
-					
+					inc_lineno(buffer);		
 				}
 				else
 				{
@@ -942,41 +962,18 @@ void add_char_to_line(char c, FILE_BUFFER *buffer)
 				}
 			}
 			++buffer->y;
-			buffer->x = 0;
-		}
-		for (size_t i = index+1; start != NULL && i < TOTAL_LINES(l_table); ++i)
-		{
-			len = 0;
-			l_table->lines[i].start_piece = start;
-			l_table->lines[i].start_offset = offset;
-			l_table->lines[i].lineno = i + l_table->lines[index].lineno;
-			l_table->lines[i].start_abs_offset = piece_offset(start);
-
-			while (start != NULL && ((c = piece_read_c(start, start->offset + offset, buffer)) >= 32 || c == 9) && ++len < width)
-			{
-				if (++offset >= start->size)
-				{
-					offset = 0;
-					start = GET_NEXT_PIECE(start, buffer);
-				}
-			}
-
-			l_table->lines[i].end_piece = start;
-			l_table->lines[i].end_offset = offset;
-			l_table->lines[i].length = len;
-
-		        if (start != NULL && ++offset >= start->size)
-			{
-				offset = 0;
-				start = GET_NEXT_PIECE(start, buffer);
-			}
-
+			buffer->x = 1;
 		}
 	}
-	else*/
+	else
+	{
+		++buffer->y;
+		buffer->x = 1;
+	}
+/*	else*
 	{
 		//	++l_table->lines[index].length;
-	}
+	}*/
 }
 
 

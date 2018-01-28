@@ -16,6 +16,14 @@
 
 #include <red_black_tree.h>
 
+
+typedef struct settings
+{
+	size_t tab_length;
+} SETTINGS;
+
+void init_settings(SETTINGS *settings);
+
 #define FILE_SIZE(a) (a->status->st_size)
 #define FILE_NAME(a) (a->name)
 #define FILE_NAME_LEN(a) (a->name_len)
@@ -44,6 +52,7 @@ typedef struct _text
 #define ABS_OFF 4 /*if checked, size_left holds absolute offset*/
 #define IN_FILE 8
 #define IN_ADD 0
+#define NILL 16
 
 #define P_INFILE(a) ((a->flags & IN_FILE) != 0)
 #define P_INADD(a) ((a->flags & IN_FILE) == 0)
@@ -59,7 +68,7 @@ typedef struct _file_buffer FILE_BUFFER;
 
 typedef struct _piece
 {
-	char flags;
+        int flags;
 	size_t offset; //Offset into file or add span
 
 	size_t size_left;
@@ -147,6 +156,7 @@ typedef struct _win_desc WIN_DESC;
 
 typedef struct _file_buffer
 {
+	FILE *filp;
 	char *file_buf;
 	BUFFER *add_buf;  //Append only. Contains the new items added
 
@@ -165,12 +175,16 @@ typedef struct _file_buffer
 	size_t y;
 
 	char *rendered;
+
+	char dirty;
+
+	SETTINGS settings;
 } FILE_BUFFER;
 
 FILE_BUFFER* init_buffer(char *input_file);
 void release_buffer(FILE_BUFFER *buffer);
 
-int save_buffer(FILE_BUFFER *buffer, const char *file_name);
+int save_buffer(FILE_BUFFER *buffer);
 
 size_t add_buffer_append(const char *new_item, size_t len, FILE_BUFFER *buffer);
 
@@ -257,7 +271,7 @@ static inline size_t piece_read(char *dest, PIECE *piece, size_t offset, size_t 
 
 void get_rendered_output(char *dest, FILE_BUFFER *buffer);
 
-void inc_lineno(FILE_BUFFER *buffer);
+int inc_lineno(FILE_BUFFER *buffer);
 void dec_lineno(FILE_BUFFER *buffer);
 
 
@@ -269,10 +283,11 @@ size_t fill_lines_offset(FILE_BUFFER *buffer, size_t lineno, size_t table_offset
 void add_char_to_line(char c, FILE_BUFFER *buffer);
 
 
-#define CURRENT_LINE(a) (a->y + a->lines->start_lineno + a->lines->used_above)
+
 #define CURSOR_X(a) (a->x)
 #define CURSOR_Y(a) (a->y)
 #define LINE_INDEX(a, y) (a->used_above + y)
+#define CURRENT_LINE(a, y) (a->lines + LINE_INDEX(a, y-1))
 #define WIDTH(a) (a->cols)
 #define HEIGHT(a) (a->rows)
 #define TOTAL_LINES(a) (a->lines_count)

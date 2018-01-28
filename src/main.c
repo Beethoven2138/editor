@@ -30,9 +30,11 @@ int main(int argc, char *argv[])
 
 //	release_append_buf();	
 //	return 0;
-	
-	buffer = init_buffer("LICENSE");
-
+	if (argc < 2)
+		exit(-1);
+	buffer = init_buffer(argv[1]);
+	if (buffer == NULL)
+		exit(-1);
 	//print_buffer(buffer);
 	//end_tui(buffer);
 	/*insert_item("I as", 4, 2, buffer);
